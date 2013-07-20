@@ -1,0 +1,60 @@
+        0 
+        1 
+        2 
+        3 
+        4 
+        5 
+        6 
+        7 
+        8 
+        9 
+        10 no
+        11 yes
+        12 no
+        13 yes
+        14 yes
+        15 yes
+        16 yes
+        17 yes
+        18 yes
+        19 yes
+        20 no
+        21 yes
+        22 yes
+        23 no
+        24 yes
+        25 no
+        26 yes
+        27 no
+        28 yes
+        29 yes
+        30 yes
+        31 yes
+        32 yes
+        33 no
+        34 no
+        35 no
+        36 no
+        37 no
+        38 yes
+        39 no
+        40 yes
+        41 no
+        42 yes
+        43 yes
+        44 no
+        45 yes
+        46 no
+        47 yes
+        48 yes
+        49 no
+        50 yes
+        51 yes
+        52 no
+        53 yes
+        54 no
+        55 yes
+        56 yes
+        57 yes
+        58 yes
+        59 yes

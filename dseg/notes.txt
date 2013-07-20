@@ -1,0 +1,38 @@
+#dtype is needed
+def cvToNumpy(cvImageTemp):
+    a = zeros((cvImageTemp.height, cvImageTemp.width), dtype=int)
+    for coordinateI in range(cvImageTemp.height):
+        for coordinateJ in range(cvImageTemp.width):
+            #print "width", cvImageTemp.width
+            #print "height", cvImageTemp.height
+            #print "i, j: ", (coordinateI, coordinateJ)
+            #print cvImageTemp[coordinateI, coordinateJ][0]
+            #print a[coordinateI, coordinateJ]
+            a[coordinateI, coordinateJ] = cvImageTemp[coordinateI, coordinateJ][0]
+            #if a[coordinateI, coordinateJ] < 0 or a[coordinateI, coordinateJ] > 255:
+            #if a[coordinateI, coordinateJ] > 10:
+            #    a[coordinateI, coordinateJ] = 10
+            print "grayscale value:", a[coordinateI, coordinateJ]
+    return a
+
+
+it would be nice to have the system set up so if you click on the image tile, you can get one with more context shown so you can decide the ones that are more difficult to decide
+
+
+
+4:49 PM 7/14/2013
+whenever a new region Y is added to an object A, do a check that asks the dot question using the new region compared to region X where region X is: the unions (a big merge) of all known existing regions for A that touch region Y in the current plane (or current two planes). For the dot selection, pick a location in the big region somewhat randomly, but make sure it's intensity is pretty high. So, you can pick a region randomly but weight it so that it's more likely to get picked if the intensity is more white.
+
+What happens now, is that if it goes off track and starts putting dots way off of the "main" object that the user it working on, the user will be able to notice the problem. The dot will be located on another object entirely.
+
+
+4:52 PM 7/14/2013
+once you get a "no", you don't really need to collect the rest of the answers. not sure if mechanical turk supports this aspect well. thought about running whole process with one person per hit just to collect no's... however, that wouldn't really work well with the currently process which needs information to continue segmentation.
+
+
+6:50 PM 7/18/2013
+could do this for region matching:
+first use dot between two dots given to user (for both image)
+draw line out at every angle from the dot until you hit the edge
+record length of the line and value of the pixel (technically the gausian blur of the pixel) at the edge.
+

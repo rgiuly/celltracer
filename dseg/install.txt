@@ -1,0 +1,10 @@
+installation of blas, my notes
+used theano.config.blas.ldflags = "-Li:\\downloads\\OpenBLAS-develop\\OpenBLAS-develop -lopenblas"
+used msys.bat to start a shell
+downloaded openblas from git hub
+used symbolic link to my i: drive created in cygwin (it worked from msys) to get to the downloaded folder
+used quickbuild.win32 (it mentioned an error, but it also said it was ignored)
+put the dll in the path like this:
+cp libopenblas.dll /i/software/MinGW/bin/
+
+
