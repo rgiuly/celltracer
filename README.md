@@ -1,6 +1,10 @@
 celltracer
 ==========
 
+
+![Settings](https://github.com/ajasmin/camstudio-mousedown-highlight/raw/master/settings.png)
+
+
 Traces cells through 3D electron microscopy images with help from Mechanical Turk users. See connectomics.
 
 
