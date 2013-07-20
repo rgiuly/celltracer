@@ -35,4 +35,4 @@ Set all to 1 (true) to run all steps. That's what you do to initalize the proces
 You can run with just requestLoop() after the initialization completes one time. This is how you would typically recover/continue the process of collecting answers from mechnical turk users.
 
 
-![http://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&ved=0CC0QFjAA&url=http%3A%2F%2Fbioinformatics.oxfordjournals.org%2Fcontent%2Fearly%2F2013%2F04%2F09%2Fbioinformatics.btt154.short%3Frss%3D1&ei=7lPqUb_2L8mdiALG5oG4Bw&usg=AFQjCNHYRwppTTr_obD9Vy_2qbD51qfKDA&sig2=-66Tfqq48_DTn4gk5x2dww&bvm=bv.49478099,d.cGE    DP2: Distributed 3D Image Segmentation Using Micro-labor Workforce]
+<a href=http://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&ved=0CC0QFjAA&url=http%3A%2F%2Fbioinformatics.oxfordjournals.org%2Fcontent%2Fearly%2F2013%2F04%2F09%2Fbioinformatics.btt154.short%3Frss%3D1&ei=7lPqUb_2L8mdiALG5oG4Bw&usg=AFQjCNHYRwppTTr_obD9Vy_2qbD51qfKDA&sig2=-66Tfqq48_DTn4gk5x2dww&bvm=bv.49478099,d.cGE>    DP2: Distributed 3D Image Segmentation Using Micro-labor Workforce </a>
