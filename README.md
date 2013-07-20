@@ -20,14 +20,14 @@ Linux example:
 
 
 This bit of the code in dseg.py controls what processes will run:
-<code>
+<pre>
             if 0: initializeVolumes()
             if 0: initializeZEdges()
             if 0: makeAllRegions(initialSegFolder, inputFileExtension=inputFileExtension)
             if 0: renderAllRegions(loadImageStack(inputStack, None), 1)
             if 0: initializeRequestLoop()
             if 1: requestLoop()
-</code>
+</pre>
 
 Set all to 1 (true) to run all steps. That's what you do to initalize the process.
 
