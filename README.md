@@ -2,7 +2,7 @@ celltracer
 ==========
 
 
-(https://github.com/rgiuly/celltracer/tree/master/doc/dp2.gif)
+[[doc/dp2.gif]]
 
 
 Traces cells through 3D electron microscopy images with help from Mechanical Turk users. See connectomics.
