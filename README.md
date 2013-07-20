@@ -3,6 +3,7 @@ celltracer
 
 
 [[doc/dp2.gif]]
+![Alt attribute text Here](doc/dp2.gif)
 
 
 Traces cells through 3D electron microscopy images with help from Mechanical Turk users. See connectomics.
