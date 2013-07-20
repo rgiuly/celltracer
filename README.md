@@ -1,8 +1,6 @@
 celltracer
 ==========
 
-
-[[doc/dp2.gif]]
 ![Alt attribute text Here](doc/dp2.gif)
 
 
