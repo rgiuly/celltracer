@@ -13,20 +13,21 @@ A "data" directory with an example stack of images is included with the code for
 
 
 Windows example:
-python data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5
+<code>python data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5</code>
 
 Linux example:
-python data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5
+<code>python data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5</code>
 
 
 This bit of the code in dseg.py controls what processes will run:
+<code>
             if 0: initializeVolumes()
             if 0: initializeZEdges()
             if 0: makeAllRegions(initialSegFolder, inputFileExtension=inputFileExtension)
             if 0: renderAllRegions(loadImageStack(inputStack, None), 1)
             if 0: initializeRequestLoop()
             if 1: requestLoop()
-
+</code>
 
 Set all to 1 (true) to run all steps. That's what you do to initalize the process.
 
