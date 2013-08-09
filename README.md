@@ -14,10 +14,10 @@ A "data" directory with an example stack of images is included with the code for
 
 
 Windows example:
-<br><code>
+<br><pre>
 cd dseg<br>
-python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5
-</code>
+python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY
+</pre>
 
 Linux example:
 <br><pre>
