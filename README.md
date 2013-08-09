@@ -20,10 +20,10 @@ python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit -
 </code>
 
 Linux example:
-<br><code>
+<br><pre>
 cd dseg<br>
 python dseg.py data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY
-</code>
+</pre>
 
 
 This bit of the code in dseg.py controls what processes will run:
