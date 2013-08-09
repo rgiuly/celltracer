@@ -5,7 +5,6 @@ celltracer
 ![Alt attribute text Here](doc/movie_of_gial_cell_and_neuron_smaller.gif)
 
 
-
 Traces cells through 3D electron microscopy images with help from Mechanical Turk users. See connectomics.
 
 
@@ -23,7 +22,7 @@ python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit -
 Linux example:
 <br><code>
 cd dseg<br>
-python dseg.py data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5
+python dseg.py data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY
 </code>
 
 
