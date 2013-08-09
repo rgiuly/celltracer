@@ -15,10 +15,16 @@ A "data" directory with an example stack of images is included with the code for
 
 
 Windows example:
-<code>python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5</code>
+<code>
+cd dseg
+python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5
+</code>
 
 Linux example:
-<code>python dseg.py data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5</code>
+<code>
+cd dseg
+python dseg.py data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5
+</code>
 
 
 This bit of the code in dseg.py controls what processes will run:
