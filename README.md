@@ -2,9 +2,8 @@ celltracer
 ==========
 
 ![Alt attribute text Here](doc/dp2.gif)
+![Alt attribute text Here](doc/movie_of_gial_cell_and_neuron_smaller.gif)
 
-
-<iframe width="420" height="315" src="//www.youtube.com/embed/r9OnibTUe50" frameborder="0" allowfullscreen></iframe>
 
 
 Traces cells through 3D electron microscopy images with help from Mechanical Turk users. See connectomics.
