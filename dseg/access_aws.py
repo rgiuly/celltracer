@@ -294,12 +294,15 @@ else:
     ZProcessLayoutID = "2TUKSSZVXX2Q5G8GJGFYNNIW1QSN5K"
     mturkHost = 'mechanicalturk.amazonaws.com'
 
+mtc = None
 
-AccessID = "AKIAIP2CXALRUTRFVEOQ"
-SecretKey = "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"
-mtc = MTurkConnection(AccessID,
-                      SecretKey,
-                      host=mturkHost)
+#AccessID = "AKIAIP2CXALRUTRFVEOQ"
+#SecretKey = "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"
+def initializeMTC(AccessID, SecretKey):
+    global mtc
+    mtc = MTurkConnection(AccessID,
+                          SecretKey,
+                          host=mturkHost)
 
 def createHIT(parameter, max_assignments=1):
 
@@ -373,7 +376,7 @@ def createHIT(parameter, max_assignments=1):
     return resultSet
 
 
-def uploadFileToAmazonS3(inputFullFilename, outputBucketName, outputSubfolderName, outputFilename):
+def uploadFileToAmazonS3(inputFullFilename, outputBucketName, outputSubfolderName, outputFilename, AccessID, SecretKey):
 
     from boto.s3.key import Key
 

@@ -61,6 +61,7 @@ import link_prob
 import diffusion
 
 
+
 initSegFromPrecomputedStack = False
 assignmentsPerHIT = 2
 renderInterval = 120
@@ -71,9 +72,10 @@ storage = cv.CreateMemStorage(128000)
 
 # using imod coordinates
 #startSlice = 110
-#stopSlice = 124
 startSlice = 0
-stopSlice = 270
+#stopSlice = 124
+#startSlice = 0
+#stopSlice = 270
 
 # for conversion to and from IMOD
 imageHeight = 700
@@ -81,8 +83,8 @@ imageHeight = 700
 
 box = Box()
 
-box.cornerA = [None, None, startSlice]
-box.cornerB = [None, None, stopSlice]
+#box.cornerA = [None, None, startSlice]
+#box.cornerB = [None, None, stopSlice]
 
 
 #box.cornerA = [0, 0, 10]
@@ -173,15 +175,25 @@ parser.add_argument('--xyrender', metavar='N', nargs='+', help='')
 parser.add_argument('--zrender', metavar='N', nargs='+', help='')
 parser.add_argument("--skip_tiles", action="store_true", dest="skip_tiles")
 parser.add_argument("--init", action="store_true", dest="init")
+parser.add_argument("--restart", action="store_true", dest="restart")
 parser.add_argument("--submit", action="store_true", dest="submit")
 parser.add_argument("--print_regions", action="store_true", dest="print_regions")
+parser.add_argument("--seeds", action="store", dest="seeds")
+parser.add_argument("--delete", action="store", dest="delete")
 parser.add_argument("--send_regions_to_database", action="store_true", dest="send_regions_to_database")
 #parser.add_argument('--sum', dest='accumulate', action='store_const',
 #                   const=sum, default=max,
 #                   help='sum the integers (default: find the max)')
 #
 
+
+
+
 args = parser.parse_args()
+
+stopSlice = len(glob.glob1(args.input,"*.png"))
+
+access_aws.initializeMTC(args.access_key, args.secret_key)
 
 
 startPointZOffset = 0
@@ -191,7 +203,7 @@ if args.zoffset:
 #startPointsIMOD = [(412, 234, 250-startSlice)] 
 #startPointsIMOD = [(412, 234, 250), (226, 442, 164)]
 #startPointsIMOD = [(473, 44, 117 + startPointZOffset), (546, 87, 117 + startPointZOffset)]
-startPointsIMOD = [(473, 44, 117), (425,  465, 117)]
+startPointsIMOD = eval(args.seeds)
 #startPointsIMOD = [(412, 234, 0-startSlice)]
 
 
@@ -2320,9 +2332,11 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
         #renderGraph(compositeOutputFolder, v, allRegions, gr, allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
 
         # This is a hack to remove regions I know should not be there. It should be configurable.
-        gr.del_node('116_26')
-        gr.del_node('116_14')
-        gr.del_node('115_47')
+        for regionID in eval(args.delete):
+            gr.del_node(regionID)
+        #gr.del_node('116_26')
+        #gr.del_node('116_14')
+        #gr.del_node('115_47')
 
 
         if  numHITs >= nextScheduledRender:
@@ -2727,8 +2741,6 @@ def processRenderingGraph(gr, onlyUseRegionsThatWereSelectedByAUser):
 
 
     return regionsInGraph, componentsDict, colorMap, nodeCount
-
-
 
 
 
@@ -3909,7 +3921,7 @@ if args.zqual or args.zprocess:
             if 0 or args.init: initializeZEdges()
             if 0 or args.init: makeAllRegions(initialSegFolder, inputFileExtension=inputFileExtension)
             if 0 or args.init: renderAllRegions(loadImageStack(inputStack, None), 1)
-            if 0 or args.init: initializeRequestLoop()
+            if 0 or args.init or args.restart: initializeRequestLoop()
             if 1: requestLoop()
         else:
             runCSVProcess()
