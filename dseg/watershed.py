@@ -93,9 +93,11 @@ def watershed2DITK(input, threshold, level, useGradientMagnitude):
     
     writer = itk.ImageFileWriter.IUC2.New()
     #writer.SetFileName( sys.argv[2] )
-    writer.SetFileName("watershed_test.png")
-    writer.SetInput( cast.GetOutput()  )
-    writer.Update()
+
+    if 0:
+        writer.SetFileName("watershed_test.png")
+        writer.SetInput( cast.GetOutput()  )
+        writer.Update()
 
     return cast2.GetOutput()
 

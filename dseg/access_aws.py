@@ -295,8 +295,8 @@ else:
     mturkHost = 'mechanicalturk.amazonaws.com'
 
 
-AccessID = "AKIAJLUEFXUKI4XLWKIQ"
-SecretKey = "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"
+AccessID = "AKIAIP2CXALRUTRFVEOQ"
+SecretKey = "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"
 mtc = MTurkConnection(AccessID,
                       SecretKey,
                       host=mturkHost)
@@ -317,12 +317,14 @@ def createHIT(parameter, max_assignments=1):
     params.add(LayoutParameter('image1', parameter))
     #params.add(LayoutParameter('file2',f2))
     #print "creating HIT"
-    retryDelay = 20
+    retryDelay = 400
     print "mtc create hit"
-    for repeat in range(0, 1):
+    hitWasCreated = False
+    for repeat in range(0, 20):
         print "repeat", repeat
-        #try:
-        if 1:
+        try:
+        #if 1:
+            print "creating hit"
             resultSet = mtc.create_hit(hit_layout=ZProcessLayoutID,
                                        layout_params=params,
                                        reward=0.01,
@@ -333,21 +335,40 @@ def createHIT(parameter, max_assignments=1):
                                        lifetime=timedelta(minutes=40),
                                        qualifications=quals,
                                        max_assignments=max_assignments)
-#        except Exception:
-#            traceback.print_exc()
-#            if repeat == 5: raise Exception("messed up")
-#            print "mechanical turk failed to create HIT, trying again in %d seconds" % retryDelay
-#            time.sleep(retryDelay)
-#        except:
-#            traceback.print_exc()
-#            if repeat == 5: raise Exception("messed up")
-#            print "mechanical turk failed to create HIT, trying again in %d seconds" % retryDelay
-#            time.sleep(retryDelay)
-#        else:
-#            traceback.print_exc()
-#            if repeat == 5: raise Exception("messed up")
-#            print "mechanical turk failed to create HIT, trying again in %d seconds" % retryDelay
-#            time.sleep(retryDelay)
+            hitWasCreated = True
+            break
+        except Exception:
+            traceback.print_exc()
+            #if repeat == 19: raise Exception("messed up")
+            print "mechanical turk failed to create HIT, trying again in %d seconds" % retryDelay
+            time.sleep(retryDelay)
+        except:
+            traceback.print_exc()
+            #if repeat == 19: raise Exception("messed up")
+            print "mechanical turk failed to create HIT, trying again in %d seconds" % retryDelay
+            time.sleep(retryDelay)
+        else:
+            traceback.print_exc()
+            #if repeat == 19: raise Exception("messed up")
+            print "mechanical turk failed to create HIT, trying again in %d seconds" % retryDelay
+            time.sleep(retryDelay)
+
+    if not hitWasCreated:
+        # do this to generate the error message
+        resultSet = mtc.create_hit(hit_layout=ZProcessLayoutID,
+                                   layout_params=params,
+                                   reward=0.01,
+                                   title="Does the dot stay inside the cell",
+                                   description="Does the dot stay inside the cell",
+                                   keywords="image, tag",
+                                   duration=timedelta(minutes=1),
+                                   lifetime=timedelta(minutes=40),
+                                   qualifications=quals,
+                                   max_assignments=max_assignments)
+        sys.exit(1)
+
+
+
     print "mtc create hit finished"
     return resultSet
 

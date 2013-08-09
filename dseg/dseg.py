@@ -20,6 +20,12 @@
 # /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/paper_cerebellum --zprocess --submit
 # /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5
 
+"""
+python dseg.py /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/cerebellum0 --zprocess --submit --sigma=4 --level=0.5 --zoffset=0
+python dseg.py /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/cerebellum1 --zprocess --submit --sigma=4 --level=0.5 --zoffset=1
+python dseg.py /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/cerebellum2 --zprocess --submit --sigma=4 --level=0.5 --zoffset=2
+"""
+
 
 import sys
 sys.path.append("../cytoseg")
@@ -39,6 +45,7 @@ import access_aws
 from image_util import *
 from images2gif import writeGif
 from watershed import *
+from dseg_util import *
 from pygraph.classes.graph import graph
 import pygraph.algorithms.accessibility
 from random import choice
@@ -51,23 +58,25 @@ import binascii
 import SimpleITK
 import graph_util
 import link_prob
+import diffusion
 
 
 initSegFromPrecomputedStack = False
 assignmentsPerHIT = 2
+renderInterval = 120
 storage = cv.CreateMemStorage(128000)
 
 #zScale = 10.0
 
 
 # using imod coordinates
-#startSlice = 245
-#startSlice = 249
+#startSlice = 110
+#stopSlice = 124
 startSlice = 0
 stopSlice = 270
-#startPointsIMOD = [(412, 234, 250-startSlice)] 
-startPointsIMOD = [(412, 234, 250), (226, 442, 164)]
-#startPointsIMOD = [(412, 234, 0-startSlice)]
+
+# for conversion to and from IMOD
+imageHeight = 700
 
 
 box = Box()
@@ -150,6 +159,7 @@ parser.add_argument("output", action="store")
 parser.add_argument("--threshold", action="store", dest="threshold")
 parser.add_argument("--level", action="store", dest="level")
 parser.add_argument("--sigma", action="store", dest="sigma")
+parser.add_argument("--zoffset", action="store", dest="zoffset")
 parser.add_argument("--access_key", action="store", dest="access_key")
 parser.add_argument("--secret_key", action="store", dest="secret_key")
 parser.add_argument("--answers", action="store", dest="answers")
@@ -162,6 +172,7 @@ parser.add_argument("--zprocess", action="store_true", dest="zprocess")
 parser.add_argument('--xyrender', metavar='N', nargs='+', help='')
 parser.add_argument('--zrender', metavar='N', nargs='+', help='')
 parser.add_argument("--skip_tiles", action="store_true", dest="skip_tiles")
+parser.add_argument("--init", action="store_true", dest="init")
 parser.add_argument("--submit", action="store_true", dest="submit")
 parser.add_argument("--print_regions", action="store_true", dest="print_regions")
 parser.add_argument("--send_regions_to_database", action="store_true", dest="send_regions_to_database")
@@ -169,7 +180,21 @@ parser.add_argument("--send_regions_to_database", action="store_true", dest="sen
 #                   const=sum, default=max,
 #                   help='sum the integers (default: find the max)')
 #
+
 args = parser.parse_args()
+
+
+startPointZOffset = 0
+if args.zoffset:
+    startPointZOffset = int(args.zoffset)
+
+#startPointsIMOD = [(412, 234, 250-startSlice)] 
+#startPointsIMOD = [(412, 234, 250), (226, 442, 164)]
+#startPointsIMOD = [(473, 44, 117 + startPointZOffset), (546, 87, 117 + startPointZOffset)]
+startPointsIMOD = [(473, 44, 117), (425,  465, 117)]
+#startPointsIMOD = [(412, 234, 0-startSlice)]
+
+
 print "args", args
 #for argument in dict(args):
 #    print argument
@@ -407,14 +432,6 @@ def makeRegionIdentifier(zIndex, number):
     return "%d_%d" % (zIndex, number)
 
 
-def regionIdentifierToNumbers(identifier):
-
-    result = re.match(r"(.*)_(.*)", identifier)
-    index1 = int(result.group(1))
-    index2 = int(result.group(2))
-    return (index1, index2)
-
-
 def removeBigDarkNodes(gr, v, allRegions):
 
     averageGrayValue = {}
@@ -601,10 +618,11 @@ def initializeVolumes():
     s = v.shape
 
 
-    clearDirectory(initialSegFolder)
-
-    if not(initSegFromPrecomputedStack):
-        makeLabelVolumeStackWatershed(os.path.join(outputFolder, 'original'), initialSegFolder)
+    if 1:
+        makeDirectory(initialSegFolder)
+    
+        if not(initSegFromPrecomputedStack):
+            makeLabelVolumeStackWatershed(os.path.join(outputFolder, 'original'), initialSegFolder)
 
 
 
@@ -720,24 +738,6 @@ def cropCV(array, boundingBox):
     return result
 
 
-def boundingBox(points):
-
-    xMin = points[0][0]
-    xMax = points[0][0]
-    yMin = points[0][1]
-    yMax = points[0][1]
-    for p in points:
-        x = p[0]
-        y = p[1]
-        if x < xMin:
-            xMin = x
-        if x > xMax:
-            xMax = x
-        if y < yMin:
-            yMin = y
-        if y > yMax:
-            yMax = y
-    return (xMin, yMin, xMax, yMax)
 
 
 def getRegions2D(image, zIndex):
@@ -838,6 +838,7 @@ def makeAllRegions(initialSegFolder, inputFileExtension="pickle"):
     #c.execute('''CREATE TABLE stocks
     #             (date text, trans text, symbol text, qty real, price real)''')
 
+    print "reseting table"
     try:
         c.execute('DROP TABLE regions')
     except:
@@ -851,8 +852,11 @@ def makeAllRegions(initialSegFolder, inputFileExtension="pickle"):
 
     numFiles = len(glob.glob(os.path.join(initialSegFolder, "*." + inputFileExtension)))
 
+    print "adding regions"
     zStart, zStop = getStartAndStop(startSlice, stopSlice, numFiles)
     for z in range(zStart, zStop):
+
+        print "adding regions in plane", z
 
         #filename = "output%03d.pickle" % z
 
@@ -1047,25 +1051,30 @@ def getSavedImage(folder, z, fileExtension):
 
 def getZEdges(fileExtension="pickle"):
 
+    stepSize = 2
+    print "get z edges step size:", 2
+
     edges = {}
+
+    gap = 1
 
     numFiles = len(glob.glob(os.path.join(initialSegFolder, "*." + fileExtension)))
     startZ, stopZ = getStartAndStop(startSlice, stopSlice, numFiles)
-    for k in range(startZ, stopZ - 1):
+    for k in range(startZ, stopZ - gap):
         print "getting z edges"
-        print "current slice: %d, stop: %d" % (k, stopZ - 1)
+        print "current slices: %d and %d, stop: %d" % (k, k + gap, stopZ - gap)
         #filename1 = "output%03d.png" % k
         #filename2 = "output%03d.png" % (k + 1)
 
         #image1 = numpy.transpose(scipy.misc.imread(os.path.join(initialSegFolder, filename1)))
         #image2 = numpy.transpose(scipy.misc.imread(os.path.join(initialSegFolder, filename2)))
         image1 = numpy.transpose(getSavedImage(initialSegFolder, k, fileExtension=fileExtension))
-        image2 = numpy.transpose(getSavedImage(initialSegFolder, k + 1, fileExtension=fileExtension))
+        image2 = numpy.transpose(getSavedImage(initialSegFolder, k + gap, fileExtension=fileExtension))
 
 
         # scan for changes along third coordinate
-        for i in range(0, image1.shape[0]):
-            for j in range(0, image1.shape[0]):
+        for i in range(0, image1.shape[0], stepSize):
+            for j in range(0, image1.shape[0], stepSize):
     
                     number1 = image1[i, j]
                     number2 = image2[i, j]
@@ -1073,7 +1082,7 @@ def getZEdges(fileExtension="pickle"):
                     if 1:
     
                         node1 = makeRegionIdentifier(k, number1)
-                        node2 = makeRegionIdentifier(k + 1, number2)
+                        node2 = makeRegionIdentifier(k + gap, number2)
 
                         # makes the ordering consistent    
                         if number1 < number2:
@@ -1734,6 +1743,229 @@ def makeZDecisionImage(key, useCenterPoints):
 
 
 
+def getComponentGroups(gr):
+
+    componentsDict = pygraph.algorithms.accessibility.connected_components(gr)
+
+    for regionID in componentsDict:
+
+        groupID = componentsDict[regionID]
+
+        # if a group does not exist yet, create it
+        if not(groupID in componentGroups):
+            componentGroups[groupID] = []
+
+        # add regionID to the group
+        componentGroups[groupID].append(regionID)
+
+
+
+def makeZDecisionImage2(gr, regionIDs, useCenterPoints):
+
+    creatingImage = False
+
+    generateDiagnostic = False
+
+    #print "number of adjacencies for plane to plane", numProcessed, "total number", len(zEdges)
+    #print "number of adjacencies processed for plane to plane", numProcessed, "total number", len(zEdges)
+
+    z = [None, None]
+    #regionsAtZ = [None, None]
+    #regionIndexes = [None, None]
+
+
+    #((z[0], regionIndexes[0]), (z[1], regionIndexes[1])) = key
+    print regionIDs
+    #region0 = allRegions[regionIDs[0]]
+    #region1 = allRegions[regionIDs[1]]
+
+    #todo: important, could be multiple isolated regions of the super region on a given plane, rip out all of them unless they are connected in the two planes under evaluation. so, use the graph library to get all transitive connections, rip out all of the nodes that are on the wrong plane (not on one of the two), and do connected components again to get components. then pick the component that is actually touching the existing node.
+
+
+    if not gr.has_node(regionIDs[0]) and gr.has_node(regionIDs[1]):
+        newRegionID = regionIDs[0]
+        existingRegionID = regionIDs[1]
+
+    if not gr.has_node(regionIDs[1]) and gr.has_node(regionIDs[0]):
+        newRegionID = regionIDs[1]
+        existingRegionID = regionIDs[0]
+
+    if not gr.has_node(regionIDs[1]) and not gr.has_node(regionIDs[0]):
+        return makeZDecisionImage(regionIDs, useCenterPoints)
+
+    # build super region associated with existing node
+    #componentGroups = getComponentsGroups(gr)
+    #for groupID in componentGroups:
+    #    if existingRegionID in componentGroups[groupID]:
+    #        superRegionGroup
+
+    #region0 = getRegionByID(regionIDs[0])
+    #region1 = getRegionByID(regionIDs[1])
+
+    newRegion = getRegionByID(newRegionID)
+    existingRegion = getRegionByID(existingRegionID)
+
+    superRegionInPlane = []
+    for regionID in gr.nodes():
+        r = getRegionByID(regionID)
+        if existingRegion.z == r.z:
+            superRegionInPlane += getRegionByID(regionID)
+
+
+    z[0] = existingRegion.z
+    z[1] = newRegion.z
+    regions = [superRegionInPlane, newRegion]
+
+    #regionsAtZ[0] = regionStack[z[0]]
+    #regionsAtZ[1] = regionStack[z[1]]
+    #regions = [regionsAtZ[0][regionIndexes[0]], regionsAtZ[1][regionIndexes[1]]]
+
+    useBoxAroundARegion = False
+
+
+    #function: makeTilesPlaneToPlane
+    if useBoxAroundARegion:
+        #b1 = array(boundingBox(regions[0]))
+        #borderSize = 180
+        raise Exception("depricated use box around region")
+    else:
+        #midPoint1 = getPointInside(regions[0])
+        #midPoint2 = getPointInside(regions[1])
+        ##midPoint1 = getMaxPoint(regions[0], gaussian[:, :, z[0]])
+        ##midPoint2 = getMaxPoint(regions[1], gaussian[:, :, z[1]])
+        print "z[0]", z[0]
+        print "z[1]", z[1]
+        midPoint1 = getMaxPoint(regions[0], numpy.transpose(getImage(gaussianOutputFolder, z[0])))
+        midPoint2 = getMaxPoint(regions[1], numpy.transpose(getImage(gaussianOutputFolder, z[1])))
+        b1 = boundingBoxTwoPoint(midPoint1, midPoint2)
+        #borderSize = 65
+        borderSize = 100
+
+
+    midPoints = [midPoint1, midPoint2]
+
+    # add border
+    b = b1 + array([-borderSize, -borderSize, borderSize, borderSize])
+    #b = b1
+
+    croppedRaw = [None, None]
+    cropped = [None, None]
+
+
+    #inside = True
+    #for imageNumber in range(0, 2):
+    #    if not(isBoxInside(v.shape[1], v.shape[0], b)):
+    #        inside = False
+    #print v.shape[1], v.shape[0], b, inside
+
+    #function: makeTilesPlaneToPlane
+    #if inside:
+    if 1:
+        for imageNumber in range(0, 2):
+
+            # extract a a tile from the full image
+            # b is a bounding box around the current edge
+            # croppedCV returns None if the cropped region doesn't fit in the full image
+
+            ##transposedImage = transpose(v[:, :, z[imageNumber]])
+            transposedImage = getImage(originalOutputFolder, z[imageNumber])
+            #print "dimension check"
+            #print toOpenCV(transposedImage, color=True).width, "=", v.shape[1]
+            #print toOpenCV(transposedImage, color=True).height, "=", v.shape[0]
+
+            croppedRaw[imageNumber] = cropCV(toOpenCV(normalize2D(transposedImage, 255), color=True), b)
+            if generateDiagnostic: cropped[imageNumber] = cropCV(cvImages[z[imageNumber]], b)
+
+            #print "croppedRaw", croppedRaw[imageNumber]
+            #print "cropped", cropped[imageNumber]
+
+            if croppedRaw[imageNumber]: croppedRaw[imageNumber] = resizeCV(croppedRaw[imageNumber], scaleFactor, color=True)
+            else: croppedRaw[imageNumber] = None
+            #print "hello"
+
+            if generateDiagnostic:
+                if cropped[imageNumber]: cropped[imageNumber] = resizeCV(cropped[imageNumber], scaleFactor, color=True)
+                else: cropped[imageNumber] = None
+
+
+        # if there's a cropped region, draw dot on the cropped region
+        #print "cropped[0]", cropped[0]
+        #print "cropped[1]", cropped[1]
+        ##if cropped[0] != None and cropped[1] != None:
+        if croppedRaw[0] != None and croppedRaw[1] != None:
+
+            for imageNumber in range(0, 2):
+                if 1:
+
+                    # draw dot
+                    if useCenterPoints:
+                        ##centerWithoutOffset = averagePoint2D(regions[imageNumber])
+                        ###print "regions[imageNumber]", regions[imageNumber]
+                        ##print "centerWithoutOffset", tuple(centerWithoutOffset)
+                        ##isInsideTheRegion = tuple(centerWithoutOffset) in regions[imageNumber]
+                        ##print "centerWithoutOffset in regions[imageNumber]", isInsideTheRegion
+                        ##if not(isInsideTheRegion):
+                        ##    centerWithoutOffset = choice(regions[imageNumber])
+                        ##    print "changing to centerWithoutOffset:", centerWithoutOffset
+                        #centerWithoutOffset = getPointInside(regions[imageNumber])
+                        centerWithoutOffset = midPoints[imageNumber]
+                        center = centerWithoutOffset - array([b[0], b[1]])
+                        if generateDiagnostic: cv.Circle(cropped[imageNumber], (center[1] * scaleFactor, center[0] * scaleFactor), 4, (0, 0, 255, 0), thickness=-1)
+                        cv.Circle(croppedRaw[imageNumber], (center[1] * scaleFactor, center[0] * scaleFactor), circleRadius, (255, 255, 255, 0), thickness=-1)
+                        cv.Circle(croppedRaw[imageNumber], (center[1] * scaleFactor, center[0] * scaleFactor), circleRadius+1, (0, 0, 0, 0), thickness=2)
+    
+    
+                    # write the current tile to file
+                    filename = "crop"
+        
+                    for id in regionIDs:
+                        filename += "_%s" % id
+        
+                    extension = ".jpg"
+                    planeToPlaneDiagnosticTileFolder = os.path.join(tileFolder, "plane_to_plane_diagnostic")
+                    planeToPlaneTileFolder = os.path.join(tileFolder, "plane_to_plane")
+                    makeDirectory(planeToPlaneTileFolder)
+                    makeDirectory(planeToPlaneDiagnosticTileFolder)
+                    fullFilename = os.path.join(planeToPlaneDiagnosticTileFolder, filename + "_" + str(imageNumber) + extension)
+                    fullFilenameRaw = os.path.join(planeToPlaneDiagnosticTileFolder, filename + "_" + str(imageNumber) + "_raw" + extension)
+
+                    if imageNumber == 0:
+                        resultFilename = filename
+                        #fileList.append(filename)
+
+                    creatingImage = True
+                    print fullFilename
+                    if generateDiagnostic: cv.SaveImage(fullFilename, cropped[imageNumber])
+                    cv.SaveImage(fullFilenameRaw, croppedRaw[imageNumber])
+
+
+            print "writing gif"
+            #contrast = 1.0
+            animationFilename = os.path.join(planeToPlaneTileFolder, addAnimationSuffix(filename) + ".gif")
+            animationImages = []
+            for cvImageTemp in croppedRaw:
+                ##pilImage = CVToPIL(cvImageTemp, color=True)
+                ##gifImage = pilImage.convert('RGB').convert('P', palette=Image.ADAPTIVE)
+                ##print "gifImage", gifImage
+                #animationImages.append(255 - numpy.asarray(gifImage))
+                #print numpy.asarray(gifImage)
+                a = cvToNumpy(cvImageTemp)
+                animationImages.append(a)
+            writeGif(animationFilename, animationImages, duration=0.5, dither=0)
+            print animationFilename
+
+            #print "image count", i
+            #if i >=10: break
+            #if makeQualifications:
+            #    if i >= 60*2: break
+
+
+    return (creatingImage, resultFilename)
+
+
+
+
+
 
 def makeTilesPlaneToPlane(outputCSVFilename, useEdges=False, useCenterPoints=False, oversegSource="watershed"):
 
@@ -1877,9 +2109,8 @@ def initializeRequestLoop():
 
     startPoints = []
     #height = labelVolume.shape[1]
-    height = 700
     for startPointIMOD in startPointsIMOD:
-        startPoints.append((startPointIMOD[0], height - startPointIMOD[1], startPointIMOD[2]))
+        startPoints.append((startPointIMOD[0], imageHeight - startPointIMOD[1], startPointIMOD[2]))
 
     #startRegions = regionsTouchingPoints(allRegions, startPoints)
     print "finding regions touching start points"
@@ -1908,14 +2139,19 @@ def initializeRequestLoop():
     zEdges = cPickle.load(zEdgesFile)
     zEdgesFile.close()
 
+    nodeCreationTime = {}
+
     startEdges = []
     for e in zEdges:
         for key in startRegions:
             if e[0] == key or e[1] == key:
                 startEdges.append(e)
+                nodeCreationTime[e[0]] = time.time()
+                nodeCreationTime[e[1]] = time.time()
 
     print "start edges", startEdges
     dict['startEdges'] = startEdges
+    dict['startRegions'] = startRegions
 
     numProcessed = 0
 
@@ -1932,6 +2168,9 @@ def initializeRequestLoop():
     dict['hitEvaluated'] = hitEvaluated
     hitAnswer = {}
     dict['hitAnswer'] = hitAnswer
+    dict['nodeCreationTime'] = nodeCreationTime
+    poisoned = {}
+    dict['poisoned'] = poisoned
 
 
     filename = os.path.join(outputFolder, "request_loop_data")
@@ -1948,7 +2187,7 @@ def initializeRequestLoop():
 probabilityCache = {}
 
 
-def selectMostProbable(edges, hitCreatedDict, hitID, requiredHitCreatedValue, mustBeAnswered, minimumProbability=0):
+def selectMostProbable(gr, edges, hitCreatedDict, hitID, requiredHitCreatedValue, mustBeAnswered, minimumProbability=0, favorAlreadyConnected=False):
 
     mostProbableEdge = None
     max = 0
@@ -1957,11 +2196,14 @@ def selectMostProbable(edges, hitCreatedDict, hitID, requiredHitCreatedValue, mu
         if e in probabilityCache:
             p = probabilityCache[e]
         else:
-            region1 = getRegionByID(e[0])
-            region2 = getRegionByID(e[1])
+            region1 = getRegionByID(cursor, e[0])
+            region2 = getRegionByID(cursor, e[1])
             p = link_prob.linkProbability(region1, region2)
             probabilityCache[e] = p
         print "probability:", p
+
+        if favorAlreadyConnected and alreadyConnected(gr, e):
+            p += 1.0
 
         # skip low probability connections
         if p < max:
@@ -1978,7 +2220,14 @@ def selectMostProbable(edges, hitCreatedDict, hitID, requiredHitCreatedValue, mu
         else:
             if frozenset(e) in hitCreatedDict:
                 id = hitID[frozenset(e)]
-                results = access_aws.mtc.get_assignments(id)
+                for repeat in range(0, 20):
+                    print "repeat", repeat
+                    try:
+                        results = access_aws.mtc.get_assignments(id)
+                        break
+                    except:
+                        "couldn't ret HIT in probability function"
+                    time.sleep(200)
                 print "checking edge:", e, " HIT:", id, " number of answers so far:", len(results)
                 # if there's an answer
                 if access_aws.simulateYes or (len(results) == assignmentsPerHIT):
@@ -1989,14 +2238,17 @@ def selectMostProbable(edges, hitCreatedDict, hitID, requiredHitCreatedValue, mu
             mostProbableEdge = e
             max = p
 
-    if max < minimumProbability:
-        return None
 
     print "most probable edge:", mostProbableEdge
+
+    if max < minimumProbability:
+        print "probability %f not high enough" % max
+        return None
+
     return mostProbableEdge
 
 
-
+#todo: use alreadyConnected
 def removeIfAlreadyConnected(edge, gr, toBeEvaluated):
 
     if gr.has_node(edge[0]) and gr.has_node(edge[1]):
@@ -2006,6 +2258,16 @@ def removeIfAlreadyConnected(edge, gr, toBeEvaluated):
             return True
 
     return False
+
+
+def alreadyConnected(gr, edge):
+
+    if gr.has_node(edge[0]) and gr.has_node(edge[1]):
+        if graph_util.connected(gr, edge[0], edge[1]):
+            return True
+
+    return False
+
 
 
 #simulateYes = True
@@ -2037,13 +2299,17 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
     hitID = dict['hitID'] 
     hitEvaluated = dict['hitEvaluated']
     hitAnswer = dict['hitAnswer']
+    nodeCreationTime = dict['nodeCreationTime']
+    poisoned = dict['poisoned']
+
+    print "startRegions", dict['startRegions']
 
     file.close()
 
 
     print "request loop"
 
-    nextScheduledRender = time.clock() + (0.1 * 60)
+    nextScheduledRender = numHITs + 0
 
     #cvImages = createCVImages(initialSegFolder)
 
@@ -2053,10 +2319,17 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
         makeDirectory(compositeOutputFolder)
         #renderGraph(compositeOutputFolder, v, allRegions, gr, allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
 
-        if  time.clock() > nextScheduledRender:
-            nextScheduledRender = time.clock() + (5 * 60)
-            renderGraph(compositeOutputFolder, gr, allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
-        renderGraphToIMOD(compositeOutputFolder, gr, allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
+        # This is a hack to remove regions I know should not be there. It should be configurable.
+        gr.del_node('116_26')
+        gr.del_node('116_14')
+        gr.del_node('115_47')
+
+
+        if  numHITs >= nextScheduledRender:
+            nextScheduledRender = numHITs + renderInterval
+            #renderGraph(compositeOutputFolder, gr, poisoned, showBackgroundImage=False, allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True, startRegions=dict['startRegions'])
+            #renderGraphToIMOD(compositeOutputFolder, gr, dict['startRegions'], allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
+            renderGraphToIMODMerged(compositeOutputFolder, gr, dict['startRegions'], allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
 
         print "answers:"
         for key in hitAnswer:
@@ -2073,12 +2346,18 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
 
 
         ###########################################
-        # expand edges on a HIT that is answered
-        edge = selectMostProbable(toBeEvaluated, hitCreated, hitID, True, True)
+        # examine answers
+        # expand edges on a HIT if it has been answered Yes
+        # edge is an edge identifier, a list of two region ID's
+        edge = selectMostProbable(gr, toBeEvaluated, hitCreated, hitID, True, True, favorAlreadyConnected=False) #favorAlreadyConnected=True for poisoned test
+
+        if edge == None:
+            print "currently there are no new answers"
 
         # if the nodes are already connected somehow by any existing path, do not process this edge
         if edge != None:
             removed = removeIfAlreadyConnected(edge, gr, toBeEvaluated)
+            #removed = False #for poisoned test
         if (edge != None) and (not removed):
 
         #if frozenset(edge) in hitCreated:
@@ -2112,8 +2391,12 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
                 if answer == "Yes":
 
                     # add nodes and edge
-                    if not(gr.has_node(edge[0])): gr.add_node(edge[0])
-                    if not(gr.has_node(edge[1])): gr.add_node(edge[1])
+                    if not(gr.has_node(edge[0])):
+                        gr.add_node(edge[0])
+                        nodeCreationTime[edge[0]] = time.time()
+                    if not(gr.has_node(edge[1])):
+                        gr.add_node(edge[1])
+                        nodeCreationTime[edge[1]] = time.time()
                     gr.add_edge(edge)
 
                     #add all adjacent edges to toBeEvaluated list (if it's not already marked with hitCreated)
@@ -2127,7 +2410,15 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
                             toBeEvaluated.append(e)
                         else:
                             print " skipping", e
+
                 elif answer == "No":
+                    # if it's connected somehow, mark newer as a poisoned node
+                    if 0: #for poisoned test
+                        if alreadyConnected(gr, edge):
+                            if nodeCreationTime[edge[0]] > nodeCreationTime[edge[1]]:
+                                poisoned[e[0]] = True
+                            else:
+                                poisoned[e[1]] = True
                     pass
                 elif answer == None:
                     pass
@@ -2142,9 +2433,13 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
         # parameters for selectMostProbable:
         # HIT created must be false
         # whether it's answered or not won't be checked
-        edge = selectMostProbable(toBeEvaluated, hitCreated, hitID, False, False, minimumProbability=0.525)
+        edge = selectMostProbable(gr, toBeEvaluated, hitCreated, hitID, False, False, minimumProbability=0.525, favorAlreadyConnected=False) #favorAlreadyConnected=True for poisoned test
         # if the nodes are already connected somehow by any existing path, do not process this edge
+
+        print "creating HIT for edge %s" % str(edge)
+
         if edge != None:
+            #removed = False #for poisoned test
             removed = removeIfAlreadyConnected(edge, gr, toBeEvaluated)
 
         if (edge != None) and (not removed):
@@ -2155,6 +2450,7 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
             useCenterPoints = True
             #(success, filename) = makeZDecisionImage(allRegions, cvImages, edge, useCenterPoints)
             (success, filename) = makeZDecisionImage(edge, useCenterPoints)
+            #(success, filename) = makeZDecisionImage2(gr, edge, useCenterPoints)
             #uploadFileToAmazonS3(addAnimationSuffix(filename) + ".gif", 'plane_to_plane')
 
             access_aws.uploadFileToAmazonS3(
@@ -2176,10 +2472,11 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
 
 
         ###########################################
-        # write to shelve
+        # write to file
 
 
         print "graph:", gr
+        print "poisoned:", poisoned
         #outFile = open(os.path.join(outputFolderBase, dataName, "graph.pickle"), 'wb')
         #cPickle.dump(gr, outFile)
         #outFile.close()
@@ -2196,16 +2493,20 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
         dict['hitID'] = hitID
         dict['hitEvaluated'] = hitEvaluated
         dict['hitAnswer'] = hitAnswer
+        dict['nodeCreationTime'] = nodeCreationTime
+        dict['poisoned'] = poisoned
         #dict.sync()
 
         cPickle.dump(dict, file)
         file.close()
 
-        print "next schedule rending in %d seconds" % (nextScheduledRender - time.clock())
-        print "sleeping"
-        print "you can abort the process now, while sleeping, and come back later"
-        time.sleep(6)
-        print "finished sleeping"
+        print "next scheduled rending after %d HITs are submitted" % (nextScheduledRender - numHITs)
+
+        if numHITs % 5 == 0:
+            print "sleeping"
+            print "you can abort the process now, while sleeping, and come back later"
+            time.sleep(6)
+            print "finished sleeping"
 
 
 
@@ -2282,8 +2583,12 @@ def makeProcessCSVFile(fileList):
 
 # function: makeTilesPlaneToPlane
 
+def normalizeMaxToOne(numbers):
+    m = max(numbers)
+    return numpy.array(numbers) / float(m)
 
-def paintRegion(openCVImages, imageVolume, region, regionID, componentsDict, colorMap, nodeCount, allRegionsSeparate, showBackgroundImage, renderingScaleFactor):
+
+def paintRegion(openCVImages, imageVolume, region, regionID, componentsDict, colorMap, nodeCount, allRegionsSeparate, showBackgroundImage, renderingScaleFactor, isPoisoned, concentration=None):
 
 
         # note: possible feature: make color brighter for connected components with 2 or more nodes
@@ -2297,11 +2602,26 @@ def paintRegion(openCVImages, imageVolume, region, regionID, componentsDict, col
         if allRegionsSeparate or count == 0:
             color = (int(random.random() * 255), int(random.random() * 255), int(random.random() * 255), int(random.random() * 255))
         else:
-            if 1:
-                color = colorMap[componentsDict[regionID]]
-                print "color", color
+            if concentration != None:
+                normalizedConcentration = normalizeMaxToOne(concentration[regionID])
+                newColor = [0, 0, 0]
+                #newColor[0] = min(255.0 * concentration[regionID][0], 100)
+                #newColor[1] = min(255.0 * concentration[regionID][1], 100)
+                newColor[0] = 255.0 * normalizedConcentration[0]
+                newColor[1] = 255.0 * normalizedConcentration[1]
+                newColor[2] = 0
+                color = newColor
             else:
-                color = array(colorMap[componentsDict[key]]) / 10.0
+                color = colorMap[componentsDict[regionID]]
+                if isPoisoned:
+                    newColor = [0, 0, 0]
+                    newColor[0] = color[0] / 2.0
+                    newColor[1] = color[1] / 2.0
+                    newColor[2] = color[2] / 2.0
+                    color = newColor
+                print "color", color
+            #else:
+            #    color = array(colorMap[componentsDict[key]]) / 10.0
 
         #if thickness[componentsDict[key]] >= 1:
         if 1:
@@ -2329,15 +2649,21 @@ def paintRegion(openCVImages, imageVolume, region, regionID, componentsDict, col
                 #blendedColor = background
                 center = array(point)
                 if showBackgroundImage:
-                    cv.Circle(openCVImages[z], (center[0] * renderingScaleFactor, center[1] * renderingScaleFactor), renderingScaleFactor, blendedColor, thickness=-1)
+                    cv.Circle(openCVImages[z], (center[0] * renderingScaleFactor,
+                                                center[1] * renderingScaleFactor),
+                              renderingScaleFactor, blendedColor, thickness=-1)
                 else:
-                    cv.Circle(openCVImages[z], (center[0] * renderingScaleFactor, center[1] * renderingScaleFactor), renderingScaleFactor, labelValue, thickness=-1)
+                    #cv.Circle(openCVImages[z], (center[0] * renderingScaleFactor,
+                    #                            center[1] * renderingScaleFactor),
+                    #          renderingScaleFactor, labelValue, thickness=-1)
+                    cv.Circle(openCVImages[z], (center[0] * renderingScaleFactor,
+                                                center[1] * renderingScaleFactor),
+                              renderingScaleFactor, blendedColor, thickness=-1)
                     if 0: resultVolume[center[0], center[1], z] = labelValue
 
 
 
 def processRenderingGraph(gr, onlyUseRegionsThatWereSelectedByAUser):
-
 
     componentsDict = pygraph.algorithms.accessibility.connected_components(gr)
 
@@ -2406,7 +2732,10 @@ def processRenderingGraph(gr, onlyUseRegionsThatWereSelectedByAUser):
 
 
 
-def renderGraphToIMOD(folder, gr, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False):
+
+
+
+def renderGraphToIMODMerged(folder, gr, startRegions, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False):
 
     renderingScaleFactor = 1
     print "scale factor for rendering", renderingScaleFactor
@@ -2418,15 +2747,152 @@ def renderGraphToIMOD(folder, gr, allRegionsSeparate=False, showBackgroundImage=
     surface = 0
     currentRegionNumber = 0
     contoursFound = []
-    regionZValues = []
+
+    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    cur = conn.cursor()
+
+    # region is indexed like this: region[componentID][z][index]
+    regionsByComponent = {}
+
+    for regionID in regionsInGraph:
+        componentID = componentsDict[regionID] 
+
+        # if component is not represented already, added it
+        if componentID not in regionsByComponent:
+            regionsByComponent[componentID] = {}
+
+        z, index = regionIdentifierToNumbers(regionID)
+
+        # if plane is not represented already, add it
+        if z not in regionsByComponent[componentID]:
+            regionsByComponent[componentID][z] = []
+
+        # add this region to the plane
+        regionsByComponent[componentID][z].append(regionID)
+
+    #print "regionsByComponent", regionsByComponent
+
+
+    contoursByComponent = {}
+
+
+    for componentID, componentSet in regionsByComponent.items():
+        #print "componentSet", componentSet
+
+        planeCount = 0
+        for planeSet in componentSet.values():
+
+            planeCount += 1
+            #if planeCount > 1: break
+
+            mergedRegion = []
+            for regionID in planeSet:
+                print "region:", currentRegionNumber, "    total number:", len(regionsInGraph)
+                currentRegionNumber += 1
+                region = getRegionByID(cur, regionID)
+                mergedRegion += region
+
+            contours = regionToContours(storageForRegionToContours, mergedRegion)
+
+            print "contours"
+    
+            for c in contourIterator(contours):
+    
+                print "contour"
+                print c
+                points = []
+                for point in c:
+                    points.append(point)
+    
+                # start new list of contours for this component if needed
+                if componentID not in contoursByComponent:
+                    contoursByComponent[componentID] = []
+    
+                contoursByComponent[componentID].append({'points':points, 'z': region.z, 'name':regionID})
+
+
+
+    objectIndex = 0
+
+    numObjects = len(contoursByComponent)
+    file.write(IMODHeaderOnly(numObjects))
+
+
+    for componentID, contoursFound in contoursByComponent.items():
+
+        numContours = len(contoursFound)
+        color = colorMap[componentID]
+        print "color", color
+        file.write(IMODObjectString(objectIndex,
+                                    numContours,
+                                    "",
+                                    numpy.array(color)/255.0))
+
+        contourIndex = 0
+
+        for i in range(len(contoursFound)):
+            contour = contoursFound[i]['points']
+
+            # todo: is this needed?  
+            #if len(contour) > 0:
+            if 1:
+
+                print "writing contour:", contour
+                numPoints = len(contour)
+                regionID = contoursFound[i]['name']
+                #color = (min(255.0 * concentration[regionID][0], 100),
+                #         min(255.0 * concentration[regionID][1], 100),
+                #         0)
+    
+                file.write("contour %d %d %d\n" % (contourIndex, surface, numPoints))
+                for p in contour:
+                    print p
+                    file.write("%d %d %d\n" % (p[0], imageHeight - p[1], contoursFound[i]['z']))
+    
+                contourIndex += 1
+
+        objectIndex += 1
+
+    file.close()
+
+
+
+
+
+
+
+
+
+
+
+
+def renderGraphToIMOD(folder, gr, startRegions, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False):
+
+    renderingScaleFactor = 1
+    print "scale factor for rendering", renderingScaleFactor
+
+    regionsInGraph, componentsDict, colorMap, nodeCount = processRenderingGraph(gr, onlyUseRegionsThatWereSelectedByAUser)
+
+    file = open(os.path.join(outputFolder, "imod_file.txt"), 'wb')
+
+    surface = 0
+    currentRegionNumber = 0
+    contoursFound = []
+
+    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    cur = conn.cursor()
+
+    concentration = diffuseFromStartRegions(gr, startRegions)
+
+
 
     for key in regionsInGraph:
 
         print "region:", currentRegionNumber, "    total number:", len(regionsInGraph)
+        #if currentRegionNumber > 100: break
         currentRegionNumber += 1
-        region = getRegionByID(key)
-        contours = regionToContours(region)
-
+        region = getRegionByID(cur, key)
+        contours = regionToContours(storageForRegionToContours, region)
         # probably just one contour for this region but theoretically there could be more than one
         print "contours", contours
 
@@ -2442,26 +2908,66 @@ def renderGraphToIMOD(folder, gr, allRegionsSeparate=False, showBackgroundImage=
             for point in c:
                 points.append(point)
 
-            contoursFound.append(points)
-            regionZValues.append(region.z)
+            contoursFound.append({'points':points, 'z': region.z, 'name':key})
 
 
         #paintRegion(openCVImages, imageVolume, region, key, componentsDict, colorMap, nodeCount, allRegionsSeparate, showBackgroundImage, renderingScaleFactor)
 
     index = 0
     numContours = len(contoursFound)
-    file.write(IMODHeader(numContours))
+    if 0:
+        file.write(IMODHeader(numContours))
+    file.write(IMODHeaderOnly(len(contoursFound)))
     #todo: set z scale
     for i in range(len(contoursFound)):
-        contour = contoursFound[i]
-        print "writing contour:", contour
-        numPoints = len(contour)
-        file.write("contour %d %d %d\n" % (index, surface, numPoints))
+    #for i in range(100):
+    #while True:
+        #i = index
+        contour = contoursFound[i]['points']
+
+        if len(contour) > 0:
+            print "writing contour:", contour
+            numPoints = len(contour)
+            regionID = contoursFound[i]['name']
+            color = (min(255.0 * concentration[regionID][0], 100),
+                     min(255.0 * concentration[regionID][1], 100),
+                     0)
+
+            file.write(IMODObjectString(index, 1, contoursFound[i]['name'], color))
+            #file.write("contour %d %d %d\n" % (index, surface, numPoints))
+            file.write("contour %d %d %d\n" % (0, surface, numPoints))
+            for p in contour:
+                print p
+                file.write("%d %d %d\n" % (p[0], imageHeight - p[1], contoursFound[i]['z']))
+
         index += 1
-        for p in contour:
-            print p
-            file.write("%d %d %d\n" % (p[0], p[1], regionZValues[i]))
+        #if index == len(contoursFound):
+        #    break
     file.close()
+
+
+
+def IMODHeaderOnly(numObjects):
+    return """# imod ascii file version 2.0
+
+
+imod {numObjects}
+max 700 700 270
+offsets 0 0 0
+angles 0 0 0
+scale 1 1 1
+mousemode  1
+drawmode   1
+b&w_level  51,232
+resolution 3
+threshold  128
+pixsize    1
+units      pixels
+refcurscale 1 1 1
+refcurtrans 0 0 0
+refcurrot 0 0 0
+refoldtrans 0 0 0
+""".format(numObjects=numObjects)
 
 
 
@@ -2530,9 +3036,58 @@ matflags2 0
 """ % numContours
 
 
+def IMODObjectString(index, numContours, name, color):
+    return """
+object {index} {numContours} 0
+name {name}
+color {red} {green} {blue} 0
+linewidth 1
+surfsize  0
+pointsize 0
+axis      0
+drawmode  1
+width2D   1
+symbol    1
+symsize   3
+symflags  0
+ambient   102
+diffuse   255
+specular  127
+shininess 4
+obquality 0
+valblack  0
+valwhite  255
+matflags2 0
+""".format(index=index, numContours=numContours, name=name,
+           red=color[0], green=color[1], blue=color[2])
+
+
+
+def diffuseFromStartRegions(gr, startRegions):
+
+    c = {}
+    constantNodes = {}
+    for classNumber, startRegionID in enumerate(startRegions):
+        c[startRegionID] = numpy.zeros(len(startRegions))
+        c[startRegionID][classNumber] = 100000000.0
+        constantNodes[startRegionID] = True
+
+    print "initial concentration:", c
+
+    concentration = diffusion.diffusion(gr,
+          c,
+          constantNodes,
+          len(startRegions))
+
+    return concentration
+
+
 
 #def renderGraph(folder, imageVolume, regions, gr, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False):
-def renderGraph(folder, gr, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False):
+def renderGraph(folder, gr, poisoned, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False, startRegions=None):
+
+    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    cur = conn.cursor()
 
     imageVolume = loadImageStack(inputStack, None)
 
@@ -2559,12 +3114,20 @@ def renderGraph(folder, gr, allRegionsSeparate=False, showBackgroundImage=True, 
             openCVImages[z] = toOpenCV(numpy.transpose(getImage(originalOutputFolder, z)), color=True)
         else:
             #openCVImages[z] = cv.CreateImage((s[0], s[1]), 8, 3)
-            openCVImages[z] = cv.CreateImage((s[0], s[1]), 32, 1)
+
+            # todo: this is an inefficient way to get the size of the image
+            tempCVImage = toOpenCV(numpy.transpose(getImage(originalOutputFolder, z)), color=True)
+
+            #openCVImages[z] = cv.CreateImage((s[0], s[1]), 32, 1)
+            openCVImages[z] = tempCVImage
             cv.SetZero(openCVImages[z])
 
 
     regionsInGraph, componentsDict, colorMap, nodeCount = processRenderingGraph(gr, onlyUseRegionsThatWereSelectedByAUser)
 
+    concentration = diffuseFromStartRegions(gr, startRegions)
+
+    print "concentration:", concentration
 
     # render regions in volume of open cv images
     currentRegionNumber = 0
@@ -2574,10 +3137,10 @@ def renderGraph(folder, gr, allRegionsSeparate=False, showBackgroundImage=True, 
         currentRegionNumber += 1
 
         ##region = regions[key]
-        region = getRegionByID(key)
+        region = getRegionByID(cur, key)
         #color = (int(random.random() * 255), int(random.random() * 255), int(random.random() * 255), int(random.random() * 255))
 
-        paintRegion(openCVImages, imageVolume, region, key, componentsDict, colorMap, nodeCount, allRegionsSeparate, showBackgroundImage, renderingScaleFactor)
+        paintRegion(openCVImages, imageVolume, region, key, componentsDict, colorMap, nodeCount, allRegionsSeparate, showBackgroundImage, renderingScaleFactor, key in poisoned, concentration=concentration)
 
 
     labelVolumePath = makeDirectory(os.path.join(outputFolder, "labels_separate=%s" % allRegionsSeparate))
@@ -2668,14 +3231,6 @@ def fetchRegion(c):
     region = cPickle.loads(binascii.unhexlify(regionBlob))
     return z, number, region
 
-
-def getRegionByID(regionIdentifier):
-
-    zIndex, numberIndex = regionIdentifierToNumbers(regionIdentifier)
-    cursor.execute('SELECT * FROM regions where z=%d and number=%d' % (zIndex, numberIndex))
-    fetchResult = cursor.fetchone()
-    z, number, regionBlob, primaryKey = fetchResult
-    return cPickle.loads(binascii.unhexlify(regionBlob))
 
 
 
@@ -3225,30 +3780,8 @@ def processXYSlice_old(array2D, zIndex):
 #render(edges, edgeExistsAnswer='No')
 
 
-storageForRegionToContours = cv.CreateMemStorage (0)
+storageForRegionToContours = cv.CreateMemStorage(0)
 
-def regionToContours(region):
-
-    (xMin, yMin, xMax, yMax) = boundingBox(region)
-
-    width = xMax - xMin + 2
-    height = yMax - yMin + 2
-
-    image = cv.CreateImage((width, height), cv.IPL_DEPTH_8U, 1)
-    cv.SetZero(image)
-
-    for point in region:
-        image[point[1] - yMin, point[0] - xMin] = 255
-
-    # split the object for a test
-    #for y in range(0, height):
-    #    image[width/2, y] = 0
-
-    #cv.SaveImage(r"i:\temp\out_image_intermediate.jpg", image)
-
-    contours = cv.FindContours(image, storageForRegionToContours, mode=cv.CV_RETR_CCOMP, method=cv.CV_CHAIN_APPROX_SIMPLE, offset=(xMin, yMin))
-
-    return contours
 
 
 def contourIterator(contour):
@@ -3372,11 +3905,11 @@ if args.zqual or args.zprocess:
         inputFileExtension = "pickle"
     if not(args.skip_tiles):
         if args.submit:
-            if 0: initializeVolumes()
-            if 0: initializeZEdges()
-            if 0: makeAllRegions(initialSegFolder, inputFileExtension=inputFileExtension)
-            if 0: renderAllRegions(loadImageStack(inputStack, None), 1)
-            if 0: initializeRequestLoop()
+            if 0 or args.init: initializeVolumes()
+            if 0 or args.init: initializeZEdges()
+            if 0 or args.init: makeAllRegions(initialSegFolder, inputFileExtension=inputFileExtension)
+            if 0 or args.init: renderAllRegions(loadImageStack(inputStack, None), 1)
+            if 0 or args.init: initializeRequestLoop()
             if 1: requestLoop()
         else:
             runCSVProcess()

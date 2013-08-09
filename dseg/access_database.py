@@ -11,10 +11,11 @@ for row in db.execute("select nextval('general_sequence')"):
 print "annotation_id", annotation_id
 
 
-dataset_id = 831681
-model_number = 3
+#dataset_id = 831681
+dataset_id = 10821524
+#model_number = 3
+model_number = 1093
 print "http://galle.crbs.ucsd.edu:8081/Canvas_GWT_Test3/Canvas_GWT_Test2.html?datasetID=%d&modelID=%d" % (dataset_id, model_number)
-
 
 
 #db = create_engine('sqlite:///tutorial.db')
@@ -31,7 +32,7 @@ metadata = MetaData(db)
 #)
 
 
-if 0:
+def initializeSendContour():
 
     db.execute("insert into slash_annotation(annotation_id, dataset_id) values(%s, %d)" % (annotation_id, dataset_id))
 
@@ -53,7 +54,7 @@ def sendContour(zIndex, points):
         if i != (len(points) - 1):
             pointString += ", "
 
-    print "pointString", pointString
+    #print "pointString", pointString
 
     for row in db.execute("select nextval('general_sequence')"):
         geom_id = row[0]
