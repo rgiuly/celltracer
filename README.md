@@ -1,7 +1,7 @@
 celltracer
 ==========
 
-![Alt attribute text Here](doc/dp2.gif)
+![Alt attribute text Here](doc/dp2_300x300.gif)
 ![Alt attribute text Here](doc/movie_of_gial_cell_and_neuron_smaller.gif)
 
 
