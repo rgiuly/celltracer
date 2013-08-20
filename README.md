@@ -45,9 +45,8 @@ You can manually exclude nodes from the output:
 
 Creating a qualification set that will be used to train users:
 
-python dseg.py data /home/rgiuly/output/test4 --zqual --sigma=4 --level=0.5 --access_key=X --secret_key=X
 
-
+python dseg.py data /home/rgiuly/output/test4 --zqual --answers=~/answers1.txt --sigma=4 --level=0.5 --access_key=X --secret_key=X
 
 
 
