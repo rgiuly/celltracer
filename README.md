@@ -16,13 +16,13 @@ A "data" directory with an example stack of images is included with the code for
 Windows example:
 <br><pre>
 cd dseg<br>
-python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY --init
+python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY --init  --seeds=[[473,44,10],[425,465,10]]
 </pre>
 
 Linux example:
 <br><pre>
 cd dseg<br>
-python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY --init
+python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY --init  --seeds=[[473,44,10],[425,465,10]]
 </pre>
 
 
