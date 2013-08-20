@@ -22,7 +22,7 @@ python dseg.py data O:\images\neuropil\data3 I:\dp2_output --zprocess --submit -
 Linux example:
 <br><pre>
 cd dseg<br>
-python dseg.py data /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY --init
+python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY --init
 </pre>
 
 
