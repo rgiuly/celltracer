@@ -1602,8 +1602,8 @@ def makeZDecisionImage(key, useCenterPoints):
     regionIds = key
     #region0 = allRegions[regionIds[0]]
     #region1 = allRegions[regionIds[1]]
-    region0 = getRegionByID(regionIds[0])
-    region1 = getRegionByID(regionIds[1])
+    region0 = getRegionByID(cursor, regionIds[0])
+    region1 = getRegionByID(cursor, regionIds[1])
     z[0] = region0.z
     z[1] = region1.z
     regions = [region0, region1]
@@ -2331,9 +2331,11 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
         makeDirectory(compositeOutputFolder)
         #renderGraph(compositeOutputFolder, v, allRegions, gr, allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
 
-        # This is a hack to remove regions I know should not be there. It should be configurable.
-        for regionID in eval(args.delete):
-            gr.del_node(regionID)
+        # This allows user to specify nodes that should be removed no matter what the workers choose for connections.
+        # It's a way to correct what the workers have done.
+        if args.delete:
+            for regionID in eval(args.delete):
+                gr.del_node(regionID)
         #gr.del_node('116_26')
         #gr.del_node('116_14')
         #gr.del_node('115_47')
@@ -2471,7 +2473,9 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
                 os.path.join(tileFolder, 'plane_to_plane', addAnimationSuffix(filename) + ".gif"),
                 dataName,
                 'data/plane_to_plane',
-                addAnimationSuffix(filename) + ".gif")
+                addAnimationSuffix(filename) + ".gif",
+                args.access_key,
+                args.secret_key)
 
             # create HIT
             resultSet = access_aws.createHIT(makePlaneToPlaneUrl(filename), max_assignments=assignmentsPerHIT)
