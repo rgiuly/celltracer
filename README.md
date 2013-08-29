@@ -28,14 +28,14 @@ python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --le
 
 Parameters:
 ==========
- --zprocess Run process for collecting decisions from users.
- --submit Submit decisions to Mechanical Turk.
- --sigma=4 Amount of blur before watershed.
- --level=0.5 Watershed level.
- --access_key=X Set to your access key from Mechanical Turk.
- --secret_key=X Set to your secret key from Mechanical Turk.
- --init Do initialization. This make take some time from a large volume.
- --seeds=[[473,44,10],[425,465,10]] Seeds where each cell should start in the form [X,Y,Z]. You can use IMOD to get the numbers.
+* --zprocess Run process for collecting decisions from users.
+* --submit Submit decisions to Mechanical Turk.
+* --sigma=4 Amount of blur before watershed.
+* --level=0.5 Watershed level.
+* --access_key=X Set to your access key from Mechanical Turk.
+* --secret_key=X Set to your secret key from Mechanical Turk.
+* --init Do initialization. This make take some time from a large volume.
+* --seeds=[[473,44,10],[425,465,10]] Seeds where each cell should start in the form [X,Y,Z]. You can use IMOD to get the numbers.
 
 
 
