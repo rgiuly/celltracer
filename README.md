@@ -26,7 +26,7 @@ python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --le
 </pre>
 
 
-Parameters:
+parameters
 ==========
 * --zprocess Run process for collecting decisions from users.
 * --submit Submit decisions to Mechanical Turk.
