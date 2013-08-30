@@ -42,6 +42,9 @@ parameters
 To initially start the process from the beginning, use "--init". This will create initial superpixels (which takes a long time) and then it will start collecting decisions from users.
 <pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --init --seeds=[[473,44,10],[425,465,10]]</pre>
 
+You can add parameters such as this. New regions will be sent to the database as they are discovered by users.
+<pre>--send_regions_to_database --dataset_id=10821524 --model_id=2000</pre>
+
 
 You can abort the process when results are being collected from users and pick up later.
 To continue collecting, leave out --init like this:
