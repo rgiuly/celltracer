@@ -40,15 +40,15 @@ parameters
 
 
 To initially start the process from the beginning, use "--init". This will create initial superpixels and collect from users.
-python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --init --seeds=[[473,44,10],[425,465,10]]
+<pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --init --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
 Leave out --init if you want to continue a run:
-python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --seeds=[[473,44,10],[425,465,10]]
+<pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
 You can run with just requestLoop() after the initialization completes one time. This is how you would typically recover/continue the process of collecting answers from mechnical turk users.
-python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --restart --seeds=[[473,44,10],[425,465,10]]
+<pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --restart --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
 You can manually exclude nodes from the output:
@@ -59,13 +59,13 @@ You can manually exclude nodes from the output:
 Creating a qualification set that will be used to train users:
 
 
-python dseg.py data /home/rgiuly/output/test4 --zqual --answers=~/answers1.txt --sigma=4 --level=0.5 --access_key=X --secret_key=X
+<pre>python dseg.py data /home/rgiuly/output/test4 --zqual --answers=~/answers1.txt --sigma=4 --level=0.5 --access_key=X --secret_key=X</pre>
 
 
 
-Send watershed regions checked by users to model in SLASH portal (galle.crbs.ucsd.edu) example:
+Send superpixel regions checked by users to model in SLASH portal (galle.crbs.ucsd.edu) example:
 
-python dseg.py data /home/rgiuly/output/test4 --send_regions_to_database --dataset_id=10821524 --model_id=2000
+<pre>python dseg.py data /home/rgiuly/output/test4 --send_regions_to_database --dataset_id=10821524 --model_id=2000</pre>
 
 
 
