@@ -2363,6 +2363,9 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
             #renderGraph(compositeOutputFolder, gr, poisoned, showBackgroundImage=False, allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True, startRegions=dict['startRegions'])
             #renderGraphToIMOD(compositeOutputFolder, gr, dict['startRegions'], allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
             renderGraphToIMODMerged(compositeOutputFolder, gr, dict['startRegions'], allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
+            if args.send_regions_to_database:
+                sendRegionsToDatabase()
+
 
         print "answers:"
         for key in hitAnswer:
