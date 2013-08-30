@@ -50,7 +50,7 @@ from pygraph.classes.graph import graph
 import pygraph.algorithms.accessibility
 from random import choice
 import argparse
-from access_database import sendContour
+import access_database
 import cPickle
 import shelve
 import sqlite3
@@ -181,19 +181,29 @@ parser.add_argument("--print_regions", action="store_true", dest="print_regions"
 parser.add_argument("--seeds", action="store", dest="seeds")
 parser.add_argument("--delete", action="store", dest="delete")
 parser.add_argument("--send_regions_to_database", action="store_true", dest="send_regions_to_database")
+parser.add_argument("--dataset_id", action="store", dest="dataset_id")
+parser.add_argument("--model_id", action="store", dest="model_id")
+parser.add_argument("--qual_min_slice", action="store", dest="qual_min_slice")
+parser.add_argument("--qual_max_slice", action="store", dest="qual_max_slice")
 #parser.add_argument('--sum', dest='accumulate', action='store_const',
 #                   const=sum, default=max,
 #                   help='sum the integers (default: find the max)')
 #
 
-
-
-
 args = parser.parse_args()
+
+
+if args.dataset_id:
+    access_database.dataset_id = int(args.dataset_id)
+
+if args.model_id:
+    access_database.model_number = int(args.model_id)
+
 
 stopSlice = len(glob.glob1(args.input,"*.png"))
 
-access_aws.initializeMTC(args.access_key, args.secret_key)
+if args.submit:
+    access_aws.initializeMTC(args.access_key, args.secret_key)
 
 
 startPointZOffset = 0
@@ -203,7 +213,8 @@ if args.zoffset:
 #startPointsIMOD = [(412, 234, 250-startSlice)] 
 #startPointsIMOD = [(412, 234, 250), (226, 442, 164)]
 #startPointsIMOD = [(473, 44, 117 + startPointZOffset), (546, 87, 117 + startPointZOffset)]
-startPointsIMOD = eval(args.seeds)
+if args.seeds:
+    startPointsIMOD = eval(args.seeds)
 #startPointsIMOD = [(412, 234, 0-startSlice)]
 
 
@@ -217,12 +228,18 @@ suffix = "suffix"
 
 if args.zqual or args.xyqual:
     makeQualifications = True
-    if args.answers == None: raise Exception("Please provide the --answers argument with a valid filename.")
+    if args.answers == None: raise Exception("Please provide the --answers argument with a valid filename. For example: \n0 yes\n1 no\n2 yes\n")
 else:
     makeQualifications = False
 
 if args.xyrender or args.zrender:
     suffix = "render"
+
+
+# default for send regions to database
+if args.send_regions_to_database:
+    suffix = "z"
+
 
 # plane to plane processing specified
 if args.zqual or args.zprocess:
@@ -1448,7 +1465,7 @@ def boundingBoxTwoPoint(midPoint1, midPoint2):
 def makeLabelVolume(inputVolume, oversegSource):
 
     if oversegSource == "watershed":
-        labelVolume = makeLabelVolumeWatershed(inputVolume)
+        labelVolume = makeLabelVolumeWatershed_depricated(inputVolume)
     if oversegSource == "file":
         path = "/home/rgiuly/images/overseg/"
         labelVolume = loadRawStack(path, box, swapXY=True, flipLR=True)
@@ -3845,20 +3862,25 @@ def drawRegionsTest(regions):
 
 def sendRegionsAsContours(regions):
 
+    idInformation = access_database.initializeSendContour()
+
     print "number of regions", len(regions)
     for region in regions.values():
         #print "region", region
-        contours = regionToContours(region)
+        contours = regionToContours(storageForRegionToContours, region)
         current = contours
         while(current):
             # send contour to spatial database
             #print "contour"
             #for (x, y) in current:
             #    print (x, y),
-            print
-            sendContour(current, 0)
+            #print
+            #sendContour(current, 0)
+            access_database.sendContour(region.z, current)
             current = current.h_next()
-    
+
+    print idInformation
+    print "http://ccdb-dev-portal.crbs.ucsd.edu/WebImageBrowser/index.html?plugin=SLASH&user=rgiuly&datasetID=%d&modelID=%d" %  (idInformation['dataset_id'], idInformation['model_number'])
 
 #todo: this is not tested
 #def submitHITs(fileList):
@@ -4022,12 +4044,58 @@ if args.print_regions:
     edgesFile.close()
 
 
-if args.send_regions_to_database:
 
-    labelVolume = makeLabelVolume(v, oversegSourceForQualAndProcessAndRender)
-    allRegions = getAllRegions(labelVolume)
-    drawRegionsTest(allRegions)
-    sendRegionsAsContours(allRegions)
+def sendRegionsToDatabase():
+
+    #labelVolume = makeLabelVolume(v, oversegSourceForQualAndProcessAndRender)
+    #allRegions = getAllRegions(labelVolume)
+    #drawRegionsTest(allRegions)
+    #sendRegionsAsContours(allRegions)
+
+    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    cur = conn.cursor()
+
+    filename = os.path.join(outputFolder, "request_loop_data")
+    file = open(filename, 'rb')
+    dict = cPickle.load(file)
+    gr = dict['gr']
+
+    regionsInGraph, componentsDict, colorMap, nodeCount = processRenderingGraph(gr, True)
+
+    regionDict = {}
+    for id in regionsInGraph:
+        regionDict[id] = getRegionByID(cur, id)
+        #print "region", regionDict[id]
+        #break
+
+    sendRegionsAsContours(regionDict)
+
+    file.close()
+
+
+
+
+if args.send_regions_to_database:
+    sendRegionsToDatabase()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

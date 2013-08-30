@@ -1,4 +1,6 @@
 from sqlalchemy import *
+from datetime import datetime
+
 
 db = create_engine('postgresql://ccdbd_dev:Test753@dev-db.crbs.ucsd.edu:5432/ccdbv2_2')
 
@@ -14,7 +16,8 @@ print "annotation_id", annotation_id
 #dataset_id = 831681
 dataset_id = 10821524
 #model_number = 3
-model_number = 1093
+model_number = 1093  + datetime.now().timetuple().tm_yday
+#model_number = 1108
 print "http://galle.crbs.ucsd.edu:8081/Canvas_GWT_Test3/Canvas_GWT_Test2.html?datasetID=%d&modelID=%d" % (dataset_id, model_number)
 
 
@@ -41,7 +44,7 @@ def initializeSendContour():
     db.execute("update slash_annotation set object_name_ont_uri='rgiuly_ont_uri' where annotation_id=%s" % annotation_id)
     db.execute("update slash_annotation set version_number=%d where annotation_id=%s" % (model_number, annotation_id))
 
-
+    return {"annotation_id":annotation_id, "dataset_id":dataset_id, "model_number":model_number}
 
 
 def sendContour(zIndex, points):
