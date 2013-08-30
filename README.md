@@ -39,25 +39,25 @@ parameters
 
 
 
-To initially start the process from the beginning, use "--init". This will create initial superpixels and collect from users.
+To initially start the process from the beginning, use "--init". This will create initial superpixels (which takes a long time) and then it will start collecting decisions from users.
 <pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --init --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
-Leave out --init if you want to continue a run:
+You can abort the process when results are being collected from users and pick up later.
+To continue collecting, leave out --init like this:
 <pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
-You can run with just requestLoop() after the initialization completes one time. This is how you would typically recover/continue the process of collecting answers from mechnical turk users.
+If you want to restart collection of results, use the --restart option like this:
 <pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --restart --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
-You can manually exclude nodes from the output:
+You can manually exclude nodes from the output with --delete, for example:
 --delete=[\'116_26\',\'116_14\',\'115_47\']
 
 
 
 Creating a qualification set that will be used to train users:
-
 
 <pre>python dseg.py data /home/rgiuly/output/test4 --zqual --answers=~/answers1.txt --sigma=4 --level=0.5 --access_key=X --secret_key=X</pre>
 
