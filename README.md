@@ -63,6 +63,12 @@ python dseg.py data /home/rgiuly/output/test4 --zqual --answers=~/answers1.txt -
 
 
 
+Send watershed regions checked by users to model in SLASH portal (galle.crbs.ucsd.edu) example:
+
+python dseg.py data /home/rgiuly/output/test4 --send_regions_to_database --dataset_id=10821524 --model_id=2000
+
+
+
 <a href=http://bioinformatics.oxfordjournals.org/content/29/10/1359> DP2: Distributed 3D Image Segmentation Using Micro-labor Workforce </a>
 
 
