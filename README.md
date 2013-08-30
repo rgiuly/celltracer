@@ -48,7 +48,7 @@ To continue collecting, leave out --init like this:
 <pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
-If you want to restart collection of results, use the --restart option like this:
+If you want to delete results collected from users so far and restart collection, use the --restart option like this:
 <pre>python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --restart --seeds=[[473,44,10],[425,465,10]]</pre>
 
 
