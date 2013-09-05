@@ -177,31 +177,36 @@ class PopulationNotFound( Exception ): pass
 #                if len(l)==2: print ' '.join((i.HITId, i.HITStatus,i.HITReviewStatus,i.Amount,l[0].split('/')[-1],l[1].split('/')[-1]))
 #                else: 
 #                    print "Error"
-#    def deleteHITs(self,all):
-#        #print "deleting 100 hits max"
-#        if all:
-#            while True:
-#                print "reading page"
-#                pageOfHits = self.mtc.search_hits(page_size=100)
-#                if len(pageOfHits) == 0: break
-#                print "finished reading page"
-#                for i in pageOfHits:
-#
-#                    # approve all assignments (required for delete)
-#                    for assignment in self.mtc.get_assignments(i.HITId):
-#                        print "status", assignment.AssignmentStatus
-#                        if assignment.AssignmentStatus=="Submitted": 
-#                            self.mtc.approve_assignment(assignment.AssignmentId)
-#
-#                    self.mtc.expire_hit(i.HITId)
-#                    try:
-#                        self.mtc.dispose_hit(i.HITId)
-#                        print "disposed without error, hit:", i.HITId
-#                    except:
-#                        print "could not dispose, hit", i.HITId
-#        else:
-#            for i in self.mtc.get_reviewable_hits(page_size=100):
-#                self.mtc.dispose_hit(i.HITId)
+
+def deleteHITs(all):
+
+    global mtc
+
+    #print "deleting 100 hits max"
+    if all:
+        while True:
+            print "reading page"
+            pageOfHits = mtc.search_hits(page_size=100)
+            if len(pageOfHits) == 0: break
+            print "finished reading page"
+            for i in pageOfHits:
+
+                # approve all assignments (required for delete)
+                for assignment in mtc.get_assignments(i.HITId):
+                    print "status", assignment.AssignmentStatus
+                    if assignment.AssignmentStatus=="Submitted": 
+                        mtc.approve_assignment(assignment.AssignmentId)
+
+                mtc.expire_hit(i.HITId)
+                try:
+                    mtc.dispose_hit(i.HITId)
+                    print "disposed without error, hit:", i.HITId
+                except:
+                    print "could not dispose, hit", i.HITId
+    else:
+        for i in mtc.get_reviewable_hits(page_size=100):
+            mtc.dispose_hit(i.HITId)
+
 #    def approveAssignment(self,aID):
 #        self.mtc.approve_assignment(aID)
 #    def rejectAssignment(self,aID):

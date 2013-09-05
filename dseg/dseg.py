@@ -185,12 +185,15 @@ parser.add_argument("--dataset_id", action="store", dest="dataset_id")
 parser.add_argument("--model_id", action="store", dest="model_id")
 parser.add_argument("--qual_min_slice", action="store", dest="qual_min_slice")
 parser.add_argument("--qual_max_slice", action="store", dest="qual_max_slice")
+parser.add_argument("--approve_all", action="store_true", dest="approve_all")
 #parser.add_argument('--sum', dest='accumulate', action='store_const',
 #                   const=sum, default=max,
 #                   help='sum the integers (default: find the max)')
 #
 
 args = parser.parse_args()
+
+
 
 
 if args.dataset_id:
@@ -202,8 +205,12 @@ if args.model_id:
 
 stopSlice = len(glob.glob1(args.input,"*.png"))
 
-if args.submit:
+if args.submit or args.approve_all:
     access_aws.initializeMTC(args.access_key, args.secret_key)
+
+
+if args.approve_all:
+    access_aws.deleteHITs(True)
 
 
 startPointZOffset = 0
