@@ -72,6 +72,12 @@ Send superpixel regions checked by users to model in SLASH portal (galle.crbs.uc
 
 
 
+This approves submitted tasks, which allows Mechanical Turk users to be paid.
+
+<pre>dseg.py data /home/rgiuly/output/test4 --approve_all --access_key=X --secret_key=X</pre>
+
+
+
 <a href=http://bioinformatics.oxfordjournals.org/content/29/10/1359> DP2: Distributed 3D Image Segmentation Using Micro-labor Workforce </a>
 
 
