@@ -60,6 +60,7 @@ You can manually exclude nodes from the output with --delete, for example:
 
 
 
+
 Creating a qualification set that will be used to train users:
 
 <pre>python dseg.py data /home/rgiuly/output/test4 --zqual --answers=~/answers1.txt --sigma=4 --level=0.5 --access_key=X --secret_key=X</pre>
@@ -76,6 +77,13 @@ This approves submitted tasks, which allows Mechanical Turk users to be paid.
 
 <pre>dseg.py data /home/rgiuly/output/test4 --approve_all --access_key=X --secret_key=X</pre>
 
+
+
+
+Note:
+Suggested preprocessing of data, assuming you have a tif stack. This is for both qualification and processing. We use imagemagick to perform histogram equalization:
+cd to image folder
+<pre>ls *.tif | xargs --verbose -I XXXX convert XXXX -equalize contrastXXXX</pre>
 
 
 <a href=http://bioinformatics.oxfordjournals.org/content/29/10/1359> DP2: Distributed 3D Image Segmentation Using Micro-labor Workforce </a>
