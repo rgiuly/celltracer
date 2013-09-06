@@ -82,8 +82,8 @@ This approves submitted tasks, which allows Mechanical Turk users to be paid.
 
 Note:
 Suggested preprocessing of data, assuming you have a tif stack. This is for both qualification and processing. We use imagemagick to perform histogram equalization:
-cd to image folder
-<pre>ls *.tif | xargs --verbose -I XXXX convert XXXX -equalize contrastXXXX</pre>
+cd to image folder. For example:
+<pre>ls *.tif | xargs --verbose -I XXXX convert XXXX -negate -equalize -depth 8 contrast/first4/contrastXXXX</pre>
 
 
 <a href=http://bioinformatics.oxfordjournals.org/content/29/10/1359> DP2: Distributed 3D Image Segmentation Using Micro-labor Workforce </a>
