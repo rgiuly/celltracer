@@ -13,7 +13,8 @@ This is a new program and not fully written yet but it can be used.
 A "data" directory with an example stack of images is included with the code for demonstration.
 
 
-Installation:
+Installation
+==========
 Install python 2.7 with necessary modules.
 Install s3cmd
 
@@ -21,6 +22,9 @@ Use this command to configure s3cmd:
 <pre>s3cmd --configure</pre>
 
 
+
+Command Line
+==========
 
 Windows example:
 <br><pre>
@@ -37,7 +41,7 @@ python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --le
 
 
 
-parameters
+Parameters
 ==========
 * --zprocess Run process for collecting decisions from users.
 * --submit Submit decisions to Mechanical Turk.
