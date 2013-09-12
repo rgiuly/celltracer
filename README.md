@@ -13,6 +13,15 @@ This is a new program and not fully written yet but it can be used.
 A "data" directory with an example stack of images is included with the code for demonstration.
 
 
+Installation:
+Install python 2.7 with necessary modules.
+Install s3cmd
+
+Use this command to configure s3cmd:
+<pre>s3cmd --configure</pre>
+
+
+
 Windows example:
 <br><pre>
 cd dseg<br>
@@ -24,6 +33,8 @@ Linux example:
 cd dseg<br>
 python dseg.py data /home/rgiuly/output/test4 --zprocess --submit --sigma=4 --level=0.5 --access_key=YOURACCESSKEY --secret_key=YOURSECRETKEY --init  --seeds=[[473,44,10],[425,465,10]]
 </pre>
+
+
 
 
 parameters
