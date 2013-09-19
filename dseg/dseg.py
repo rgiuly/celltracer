@@ -19,6 +19,12 @@
 # O:\images\neuropil\data3 I:\dp2_output --zprocess --submit --sigma=4 --level=0.5
 # /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/paper_cerebellum --zprocess --submit
 # /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/paper_cerebellum --zprocess --submit --sigma=4 --level=0.5
+#
+# "/media/rgiuly/My Book/Spirou-P2_11-16-11_all_2Dbin2/contrast/first4" "/media/rgiuly/My Book/output/spirou"  --zprocess --submit --sigma=4 --level=0.5 --access_key=X --secret_key=X --init --seeds=[[5671,3333,1]] --input_format=contrastfile.%03d.tif
+
+
+
+
 
 """
 python dseg.py /home/rgiuly/images/neuropil/data3 /home/rgiuly/output/cerebellum0 --zprocess --submit --sigma=4 --level=0.5 --zoffset=0
@@ -39,6 +45,7 @@ from data_viewer import *
 from volume3d_util import *
 from contour_processing import *
 import cv
+import cv2
 import random
 import answers
 import access_aws
@@ -47,8 +54,9 @@ from images2gif import writeGif
 from watershed import *
 from dseg_util import *
 from pygraph.classes.graph import graph
-import pygraph.algorithms.accessibility
 from random import choice
+from collections import OrderedDict
+import pygraph.algorithms.accessibility
 import argparse
 import access_database
 import cPickle
@@ -59,6 +67,27 @@ import SimpleITK
 import graph_util
 import link_prob
 import diffusion
+
+
+#todo: replace this function with getSavedImage and remove getSavedImage
+def getInputImage(folder, z):
+
+    filename = inputFilenameFormatString % z
+    return scipy.misc.imread(os.path.join(folder, filename))
+
+
+
+#imageCache = {}
+
+def getImageStandardFilename(folder, z):
+
+    #if (folder, z) in imageCache:
+    #    return imageCache[(folder, z)]
+
+    filename = "output%03d.png" % z
+    image = scipy.misc.imread(os.path.join(folder, filename))
+    #imageCache[(folder, z)] = image
+    return image
 
 
 
@@ -77,8 +106,6 @@ startSlice = 0
 #startSlice = 0
 #stopSlice = 270
 
-# for conversion to and from IMOD
-imageHeight = 700
 
 
 box = Box()
@@ -186,14 +213,25 @@ parser.add_argument("--model_id", action="store", dest="model_id")
 parser.add_argument("--qual_min_slice", action="store", dest="qual_min_slice")
 parser.add_argument("--qual_max_slice", action="store", dest="qual_max_slice")
 parser.add_argument("--approve_all", action="store_true", dest="approve_all")
+parser.add_argument("--input_format", action="store", dest="input_format")
 #parser.add_argument('--sum', dest='accumulate', action='store_const',
 #                   const=sum, default=max,
 #                   help='sum the integers (default: find the max)')
 #
 
+
 args = parser.parse_args()
 
 
+if args.input_format:
+    inputFilenameFormatString = args.input_format
+else:
+    inputFilenameFormatString = "output%03d.png"
+
+
+# for conversion to and from IMOD
+imageHeight = getInputImage(args.input, 0).shape[0]
+print "image height:", imageHeight
 
 
 if args.dataset_id:
@@ -203,7 +241,11 @@ if args.model_id:
     access_database.model_number = int(args.model_id)
 
 
-stopSlice = len(glob.glob1(args.input,"*.png"))
+stopSlice = max(len(glob.glob1(args.input, "*.png")), len(glob.glob1(args.input, "*.tif")))
+
+print "stop slice", stopSlice
+print "input filename format string", args.input_format
+
 
 if args.submit or args.approve_all:
     access_aws.initializeMTC(args.access_key, args.secret_key)
@@ -264,11 +306,11 @@ else:
     dataName = dataBaseName + "_" + suffix
 #circleRadius = 3
 circleRadius = 2
-scaleFactor = 3
+#scaleFactor = 3
 
 if args.zoom:
     scaleFactor = int(args.zoom)
-print "scale factor:", scaleFactor
+#print "scale factor:", scaleFactor
 
 mturkScriptFolder = os.path.join("aws-mturk-clt-1.3.0", "samples")
 
@@ -303,13 +345,20 @@ points = []
 inputStack = args.input
 outputFolderBase = args.output
 
+# either data or qualification output folder (qualification output folder may become obsolete)
 outputFolder = os.path.join(outputFolderBase, dataName)
+
+dataOutputFolder = os.path.join(outputFolderBase, dataBaseName + "_" + suffix)
+
 makeDirectory(outputFolder)
 tileFolder = os.path.join(outputFolder, "tiles")
 makeDirectory(tileFolder)
 
 originalOutputFolder = os.path.join(outputFolder, 'original')
 gaussianOutputFolder = os.path.join(outputFolder, 'gaussian')
+
+originalDataOutputFolder = os.path.join(dataOutputFolder, 'original')
+gaussianDataOutputFolder = os.path.join(dataOutputFolder, 'gaussian')
 
 
 if initSegFromPrecomputedStack:
@@ -321,8 +370,11 @@ else:
 
 renderRegionsInPlane = False
 
-conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
 cursor = conn.cursor()
+
+#cursor.execute('''CREATE INDEX z_index ON regions (z)''')
+#cursor.execute('''CREATE INDEX number_index ON regions (number)''')
 
 
 
@@ -397,7 +449,7 @@ def copyTilesToAmazonS3(subfolderName):
     else:
         path = "data"
 
-    putCommand = "s3cmd put --recursive --acl-public %s s3://%s/%s/" % (planeToPlaneTileFolder, dataName, path)
+    putCommand = "s3cmd put --recursive --acl-public \"%s\" s3://%s/%s/" % (planeToPlaneTileFolder, dataName, path)
     print "system", putCommand
     os.system(putCommand)
 
@@ -571,6 +623,23 @@ startOfHeaderCerebellumExample2 = """<?xml version="1.0"?>
 """
 
 
+
+startOfHeaderCerebellumExample3 = """<?xml version="1.0"?>
+<QuestionForm xmlns="http://mechanicalturk.amazonaws.com/AWSMechanicalTurkDataSchemas/2005-10-01/QuestionForm.xsd">
+    <Overview>
+        <Title>Are dots inside a cell</Title>
+    <Text>
+      Instructions
+      Your task is to determine if both dots are inside of one cell. Take a look at the examples. They show you exactly the kind of question you will need to answer (correct answers are given for the examples). Then you're ready to take the test (questions at the bottom of this page).
+      
+    </Text>
+                  <Text>
+                  ____________________________________________________________
+                  </Text>
+"""
+
+
+
 startOfHeaderAxonExample = """<?xml version="1.0"?>
 <QuestionForm xmlns="http://mechanicalturk.amazonaws.com/AWSMechanicalTurkDataSchemas/2005-10-01/QuestionForm.xsd">
     <Overview>
@@ -603,7 +672,7 @@ startOfHeaderAxonExample = """<?xml version="1.0"?>
                   </Text>
 """
 
-startOfHeader = startOfHeaderCerebellumExample2
+startOfHeader = startOfHeaderCerebellumExample3
 
 endOfHeader = """</Overview>"""
 
@@ -639,12 +708,14 @@ def initializeVolumes():
     else:
         sigma = 2.0
 
-    makeClearDirectory(gaussianOutputFolder)
-    processImageStack(originalOutputFolder,
-                      gaussianOutputFolder,
-                      gaussian2DNumpy,
-                      (startSlice, stopSlice),
-                      {'sigma':sigma})
+
+    if 1:
+        makeClearDirectory(gaussianOutputFolder)
+        processImageStack(originalOutputFolder,
+                          gaussianOutputFolder,
+                          gaussian2DNumpy,
+                          (startSlice, stopSlice),
+                          {'sigma':sigma})
 
     #gaussian = zeros(v.shape)
     #for z in range(gaussian.shape[2]):
@@ -687,7 +758,7 @@ def initializeZEdges():
 
 
 #todo: move to util file
-def toOpenCV(array, color=None):
+def toOpenCV_old(array, color=None):
 
     if color:
         channels = 3
@@ -712,6 +783,51 @@ def toOpenCV(array, color=None):
     return openCVImage
 
 
+def toOpenCV(array, color=None):
+
+    s = array.shape
+    #transposeArray = numpy.copy(array)
+    #numpy.transpose(transposeArray)
+    matRawUntransposed = cv.fromarray(array)
+    print "type", matRawUntransposed.type
+    print str(matRawUntransposed)
+    print "0", type(matRawUntransposed)
+    # note: array is type 6, this tells you what type 6 means: str(cv.CreateMat(10, 10, 6))
+
+    # image to store output of transpose operation
+    matRaw = cv.CreateImage((s[0], s[1]), cv.IPL_DEPTH_64F, 1)
+    cv.Transpose(matRawUntransposed, matRaw)
+
+    mat = cv.CreateImage((s[0], s[1]), 8, 1)
+    #mat = cv.CreateImage((s[0], s[1]), cv.IPL_DEPTH_8U, 1)
+    print "1", cv.GetSize(matRaw)
+    print "2", cv.GetSize(mat)
+    print "3", type(matRaw)
+    print "4", type(mat) #mat.type()
+    # convert to 8 bit integer
+    cv.ConvertScaleAbs(matRaw, mat)
+    #matRaw.ConvertTo(mat, cv2.CV_8U)
+
+    #print mat.depth()
+
+    if color:
+
+        channels = 3
+        openCVImage = cv.CreateImage((s[0], s[1]), 8, channels)
+        #print openCVImage.depth()
+        cv.CvtColor(mat, openCVImage, cv.CV_GRAY2RGB)
+        return openCVImage
+
+    else:
+
+        #raise Exception("todo: test this before removing exception")
+        #return mat
+        return toOpenCV_old(array, color=color)
+
+
+
+
+
 def resizeCV(image, factor, color=None):
 
     if color:
@@ -719,7 +835,7 @@ def resizeCV(image, factor, color=None):
     else:
         channels = 1
 
-    result = cv.CreateImage((image.width*factor, image.height*factor), 8, channels)
+    result = cv.CreateImage((int(image.width*factor), int(image.height*factor)), 8, channels)
     cv.Resize(image, result)
 
     return result
@@ -767,7 +883,8 @@ def cropCV(array, boundingBox):
     cv.Set(result, (255, 255, 255))
     for x in range(x1, x2):
         for y in range(y1, y2):
-            if x >= 0 and y >= 0 and x < array.width and y < array.height:
+            #if x >= 0 and y >= 0 and x < array.width and y < array.height:
+            if x >= 0 and y >= 0 and x < array.height and y < array.width:
                 #print x, y
                 result[x-x1, y-y1] = array[x, y]
 
@@ -861,11 +978,11 @@ def makeAllRegions(initialSegFolder, inputFileExtension="pickle"):
     count = 0
 
     # clear lock on database if there is one
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
     conn.commit()
     conn.close()
 
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
 
     c = conn.cursor()
 
@@ -883,8 +1000,9 @@ def makeAllRegions(initialSegFolder, inputFileExtension="pickle"):
     #c.execute('''IF OBJECT_ID('regions', 'U') IS NOT NULL
     #  DROP TABLE regions''')
     c.execute('''CREATE TABLE regions
-                 (z int, number int, points blob, id INT PRIMARY KEY)''')
-
+                 (z INT, number INT, points BLOB, id INT PRIMARY KEY)''')
+    c.execute('''CREATE INDEX z_index ON regions (z)''')
+    c.execute('''CREATE INDEX number_index ON regions (number)''')
 
     numFiles = len(glob.glob(os.path.join(initialSegFolder, "*." + inputFileExtension)))
 
@@ -1061,11 +1179,6 @@ def getZEdges_depricated_because_reads_whole_volume(labelVolume):
     return edges
 
 
-#todo: replace this function with getSavedImage and remove getSavedImage
-def getImage(folder, z):
-
-    filename = "output%03d.png" % z
-    return scipy.misc.imread(os.path.join(folder, filename))
 
 
 def getSavedImage(folder, z, fileExtension):
@@ -1090,7 +1203,7 @@ def getZEdges(fileExtension="pickle"):
     stepSize = 2
     print "get z edges step size:", 2
 
-    edges = {}
+    edges = OrderedDict()
 
     gap = 1
 
@@ -1110,7 +1223,7 @@ def getZEdges(fileExtension="pickle"):
 
         # scan for changes along third coordinate
         for i in range(0, image1.shape[0], stepSize):
-            for j in range(0, image1.shape[0], stepSize):
+            for j in range(0, image1.shape[1], stepSize):
     
                     number1 = image1[i, j]
                     number2 = image2[i, j]
@@ -1607,7 +1720,8 @@ def createCVImages(folder):
 
 
 #def makeZDecisionImage(allRegions, cvImages, key, useCenterPoints):
-def makeZDecisionImage(key, useCenterPoints):
+def makeZDecisionImage(key, useCenterPoints, baseFilename="crop"):
+    """key is an edge represented as a list with form (regionID, regionID)"""
 
     creatingImage = False
 
@@ -1650,18 +1764,40 @@ def makeZDecisionImage(key, useCenterPoints):
         ##midPoint2 = getMaxPoint(regions[1], gaussian[:, :, z[1]])
         print "z[0]", z[0]
         print "z[1]", z[1]
-        midPoint1 = getMaxPoint(regions[0], numpy.transpose(getImage(gaussianOutputFolder, z[0])))
-        midPoint2 = getMaxPoint(regions[1], numpy.transpose(getImage(gaussianOutputFolder, z[1])))
+        print "start get image for mid point"
+
+
+        #todo: write this to a diagnostic image to see if it matches the input images
+        #midPoint1 = getMaxPoint(regions[0], numpy.transpose(getImageStandardFilename(gaussianDataOutputFolder, z[0])))
+        #midPoint2 = getMaxPoint(regions[1], numpy.transpose(getImageStandardFilename(gaussianDataOutputFolder, z[1])))
+
+        #todo: this is not an efficient way to handle the gaussian
+        midPoint1 = getMaxPoint(regions[0],
+                                scipy.ndimage.filters.gaussian_filter(numpy.transpose(getInputImage(args.input, z[0])), 3.0))
+        midPoint2 = getMaxPoint(regions[1],
+                                scipy.ndimage.filters.gaussian_filter(numpy.transpose(getInputImage(args.input, z[1])), 3.0))
+        print "finished image image for mid point"
         b1 = boundingBoxTwoPoint(midPoint1, midPoint2)
         #borderSize = 65
-        borderSize = 100
+        #borderSize = 100
+        borderSize = 120
 
 
     midPoints = [midPoint1, midPoint2]
 
+
     # add border
     b = b1 + array([-borderSize, -borderSize, borderSize, borderSize])
     #b = b1
+
+
+    (xMin, yMin, xMax, yMax) = b
+    biggestLength = max(double(xMax - xMin), double(yMax - yMin))
+    print "biggest length", biggestLength
+    scaleFactor = 700.0 / biggestLength
+    print "scale factor", scaleFactor
+
+
 
     croppedRaw = [None, None]
     cropped = [None, None]
@@ -1683,13 +1819,27 @@ def makeZDecisionImage(key, useCenterPoints):
             # croppedCV returns None if the cropped region doesn't fit in the full image
 
             ##transposedImage = transpose(v[:, :, z[imageNumber]])
-            transposedImage = getImage(originalOutputFolder, z[imageNumber])
+            print "loading original image"
+            transposedImage = getImageStandardFilename(originalDataOutputFolder, z[imageNumber])
+            print "finished loading original image"
             #print "dimension check"
             #print toOpenCV(transposedImage, color=True).width, "=", v.shape[1]
             #print toOpenCV(transposedImage, color=True).height, "=", v.shape[0]
 
+            print "toOpenCV"
             croppedRaw[imageNumber] = cropCV(toOpenCV(normalize2D(transposedImage, 255), color=True), b)
-            if generateDiagnostic: cropped[imageNumber] = cropCV(cvImages[z[imageNumber]], b)
+            print "-----------------"
+            #xx = cropCV(toOpenCVTest(normalize2D(transposedImage, 255), color=True), b)
+            #print croppedRaw[imageNumber] == xx
+            #for iii in range(10):
+            #    for jjj in range(10):
+            #        print "--"
+            #        print croppedRaw[imageNumber][iii, jjj]
+            #        print xx[iii, jjj]
+            #sys.exit()
+            print "finished toOpenCV"
+            #if generateDiagnostic: cropped[imageNumber] = cropCV(cvImages[z[imageNumber]], b)
+            if generateDiagnostic: cropped[imageNumber] = cropCV(toOpenCV(normalize2D(transposedImage, 255), color=True), b)
 
             #print "croppedRaw", croppedRaw[imageNumber]
             #print "cropped", cropped[imageNumber]
@@ -1711,7 +1861,14 @@ def makeZDecisionImage(key, useCenterPoints):
 
             for imageNumber in range(0, 2):
                 if 1:
-
+                    if generateDiagnostic:
+                        # fill in regions for diagnostic images
+                        diagnosticColors = ((255, 255, 0, 0), (255, 0, 255, 0))
+                        for rawPoint in regions[imageNumber]:
+                            print "raw point", rawPoint
+                            point = array(rawPoint) - array([b[0], b[1]])
+                            cv.Circle(cropped[imageNumber], (point[1] * scaleFactor, point[0] * scaleFactor), circleRadius, diagnosticColors[imageNumber], thickness=-1)
+    
                     # draw dot
                     if useCenterPoints:
                         ##centerWithoutOffset = averagePoint2D(regions[imageNumber])
@@ -1726,12 +1883,12 @@ def makeZDecisionImage(key, useCenterPoints):
                         centerWithoutOffset = midPoints[imageNumber]
                         center = centerWithoutOffset - array([b[0], b[1]])
                         if generateDiagnostic: cv.Circle(cropped[imageNumber], (center[1] * scaleFactor, center[0] * scaleFactor), 4, (0, 0, 255, 0), thickness=-1)
-                        cv.Circle(croppedRaw[imageNumber], (center[1] * scaleFactor, center[0] * scaleFactor), circleRadius, (255, 255, 255, 0), thickness=-1)
-                        cv.Circle(croppedRaw[imageNumber], (center[1] * scaleFactor, center[0] * scaleFactor), circleRadius+1, (0, 0, 0, 0), thickness=2)
+                        cv.Circle(croppedRaw[imageNumber], (int(center[1] * scaleFactor), int(center[0] * scaleFactor)), circleRadius, (255, 255, 255, 0), thickness=-1)
+                        cv.Circle(croppedRaw[imageNumber], (int(center[1] * scaleFactor), int(center[0] * scaleFactor)), circleRadius+1, (0, 0, 0, 0), thickness=2)
     
     
                     # write the current tile to file
-                    filename = "crop"
+                    filename = baseFilename
         
                     for id in regionIds:
                         filename += "_%s" % id
@@ -1750,7 +1907,9 @@ def makeZDecisionImage(key, useCenterPoints):
 
                     creatingImage = True
                     print fullFilename
-                    if generateDiagnostic: cv.SaveImage(fullFilename, cropped[imageNumber])
+                    if generateDiagnostic:
+                        print "saving diagnostic image", fullFilename
+                        cv.SaveImage(fullFilename, cropped[imageNumber])
                     cv.SaveImage(fullFilenameRaw, croppedRaw[imageNumber])
 
 
@@ -2097,7 +2256,7 @@ def adjacentEdges(edges, edge):
 
 
 
-def regionsTouchingPoints(regionCursor, startPoints):
+def regionsTouchingPoints_old(regionCursor, startPoints):
 
     touchingRegions = []
 
@@ -2121,6 +2280,28 @@ def regionsTouchingPoints(regionCursor, startPoints):
                 if startPoint3D[0] == point[0] and startPoint3D[1] == point[1]:
                     #touchingRegions.append(key)
                     touchingRegions.append(makeRegionIdentifier(zPlane, number))
+
+    return touchingRegions
+
+
+
+
+def regionsTouchingPoints(startPoints):
+
+    touchingRegions = []
+    inputFileExtension = "pickle"
+
+    for point in startPoints:
+
+        z = point[2]
+        print "getting region for point", point
+        image = getSavedImage(initialSegFolder, z, inputFileExtension)
+        print "image shape", image.shape
+        #print image
+        number = image[point[1], point[0]]
+        id = makeRegionIdentifier(z, number)
+        print "region id:", id
+        touchingRegions.append(id)
 
     return touchingRegions
 
@@ -2150,7 +2331,8 @@ def initializeRequestLoop():
 
     #startRegions = regionsTouchingPoints(allRegions, startPoints)
     print "finding regions touching start points"
-    startRegions = regionsTouchingPoints(getCursorForRegions(), startPoints)
+    #startRegions = regionsTouchingPoints(getCursorForRegions(), startPoints)
+    startRegions = regionsTouchingPoints(startPoints)
     print "start regions:", startRegions
 
 
@@ -2342,6 +2524,10 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
 
     file.close()
 
+    print "writing imod file"
+    compositeOutputFolder = os.path.join(outputFolder, "composite")
+    renderGraphToIMODMerged(compositeOutputFolder, gr, dict['startRegions'], allRegionsSeparate=False, onlyUseRegionsThatWereSelectedByAUser=True)
+    print "finished writing imod file"
 
     print "request loop"
 
@@ -2476,7 +2662,11 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
         # parameters for selectMostProbable:
         # HIT created must be false
         # whether it's answered or not won't be checked
-        edge = selectMostProbable(gr, toBeEvaluated, hitCreated, hitID, False, False, minimumProbability=0.525, favorAlreadyConnected=False) #favorAlreadyConnected=True for poisoned test
+
+        #todo: this should be like top 10% rather than an absolute number
+        #minimumProbability = 0.525
+        minimumProbability = 0.50001
+        edge = selectMostProbable(gr, toBeEvaluated, hitCreated, hitID, False, False, minimumProbability=minimumProbability, favorAlreadyConnected=False) #favorAlreadyConnected=True for poisoned test
         # if the nodes are already connected somehow by any existing path, do not process this edge
 
         print "creating HIT for edge %s" % str(edge)
@@ -2562,22 +2752,26 @@ def requestLoop(useEdges=False, useCenterPoints=False, oversegSource="watershed"
 
 
 
+# fileList is a list of image files that represent the examples to be presented to users
+def makeQualificationsFile(fileList, exampleIndexes, questionIndexes):
 
-def makeQualificationsFile(fileList):
- 
+    examples = ""
+    questions = ""
+    answersText = ""
+
     #if makeQualifications:
 
     answersDict = readAnswers(args.answers)
 
     # examples
     print "fileList", fileList
-    for i in range(10, 35):
+    for i in exampleIndexes: #range(10, 35):
         url = makePlaneToPlaneUrl(fileList[i])
         examples += makePlaneToPlaneExample(i, url, answersDict[i])
 
     # questions and answers
     #questionCount = 1
-    for i in range(35, 60):
+    for i in questionIndexes: #range(35, 60):
         url = makePlaneToPlaneUrl(fileList[i])
         #number = questionCount
         number = i
@@ -2791,7 +2985,7 @@ def renderGraphToIMODMerged(folder, gr, startRegions, allRegionsSeparate=False, 
     currentRegionNumber = 0
     contoursFound = []
 
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
     cur = conn.cursor()
 
     # region is indexed like this: region[componentID][z][index]
@@ -2922,7 +3116,7 @@ def renderGraphToIMOD(folder, gr, startRegions, allRegionsSeparate=False, showBa
     currentRegionNumber = 0
     contoursFound = []
 
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
     cur = conn.cursor()
 
     concentration = diffuseFromStartRegions(gr, startRegions)
@@ -3129,7 +3323,7 @@ def diffuseFromStartRegions(gr, startRegions):
 #def renderGraph(folder, imageVolume, regions, gr, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False):
 def renderGraph(folder, gr, poisoned, allRegionsSeparate=False, showBackgroundImage=True, onlyUseRegionsThatWereSelectedByAUser=False, startRegions=None):
 
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
     cur = conn.cursor()
 
     imageVolume = loadImageStack(inputStack, None)
@@ -3260,7 +3454,7 @@ def renderAllRegions_depricated(imageVolume, regions):
 
 def getCursorForRegions():
 
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
     c = conn.cursor()
     c.execute('SELECT * FROM regions')
     return c
@@ -3301,7 +3495,7 @@ def renderAllRegions(imageVolume, scaleFactorForRendering):
     count = 0
 
     #for key in regions:
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
     c = conn.cursor()
 
 
@@ -3678,6 +3872,8 @@ def makeLabelVolumeStackWatershed(inputFolder, outputFolder):
                       {'threshold':threshold, 'level':level, 'useGradientMagnitude':False})
 
 
+# Execute the function f on the files in the input folder,
+# and place output files in the output filder.
 def processImageStack(inputFolder, outputFolder, f, bounds, arguments):
 
     makeClearDirectory(outputFolder)
@@ -3686,6 +3882,7 @@ def processImageStack(inputFolder, outputFolder, f, bounds, arguments):
     #fileList.sort()
     #for filename in fileList:
     for i in range(bounds[0], bounds[1]):
+
         filename = "output%03d.png" % i
         #fullFilename = path.join(inputFolder, filename)
         #(path, filename) = os.path.split(fullFilename)
@@ -3701,10 +3898,23 @@ def processImageStack(inputFolder, outputFolder, f, bounds, arguments):
         print "input file:", inputFilename
         print "output file:", outputFilenamePickle
         print "output file:", outputFilenamePNG
+        print "png file is just for viewing. it will not have required bit depth to preserve all labels."
+        #print "minimum label value:", min(output)
+        #print "maximum label value:", max(output)
+        print "writing"
         scipy.misc.imsave(outputFilenamePNG, output)
         outputFile = open(outputFilenamePickle, 'wb')
         cPickle.dump(output, outputFile)
         outputFile.close()
+        print "finished writing"
+
+
+#makeClearDirectory(gaussianOutputFolder)
+#processImageStack(originalOutputFolder,
+#                  gaussianOutputFolder,
+#                  gaussian2DNumpy,
+#                  (startSlice, stopSlice),
+#                  {'sigma':float(args.sigma)})
 
 
 
@@ -3922,7 +4132,7 @@ if args.xyqual:
 
 
 
-def runCSVProcess():
+def runCSVProcess_old():
 
     # make all tiles if you are using CSV file method
     csvFilename = os.path.join(outputFolder, "images_plane_to_plane.csv")
@@ -3940,12 +4150,78 @@ def runCSVProcess():
 
 
 
+def makeZQual():
+
+    print "make z qual"
+
+    print "Writing template file with all \"no\" that you can use as a starting point. You'll need to set where the \"yes\"'s are manually."
+    filePath = os.path.join(outputFolder, "answers%d.txt" % (int(time.time()) % 10000))
+    print filePath
+    file = open(filePath, 'w')
+
+    zEdgesFile = open(os.path.join(dataOutputFolder, "zEdges.pickle"), 'rb')
+    zEdges = cPickle.load(zEdgesFile)
+    zEdgesFile.close()
+
+    #print "zEdges", zEdges
+
+    useCenterPoints = True
+
+
+    imageFileList = []
+
+    #edgeIndex = 0
+    edges = zEdges.keys()
+    #for edge in zEdges.keys():
+    numExampleImages = 50
+    for i in range(numExampleImages):
+
+        print i, "number:", numExampleImages
+        random.seed(i)
+        edgeIndex = random.randint(len(zEdges))
+        file.write("%d no\n" % i)
+        edge = edges[edgeIndex]
+        print "edge", edge
+        (success, filename) = makeZDecisionImage(edge, useCenterPoints, baseFilename="qual_%03d"%edgeIndex)
+        #(success, filename) = makeZDecisionImage2(gr, edge, useCenterPoints)
+        #uploadFileToAmazonS3(addAnimationSuffix(filename) + ".gif", 'plane_to_plane')
+        #edgeIndex += 1
+
+        imageFileList.append(filename)
+
+    file.close()
+    print filePath
+
+
+    access_aws.uploadFileToAmazonS3(
+        os.path.join(tileFolder, 'plane_to_plane', addAnimationSuffix(filename) + ".gif"),
+        dataName,
+        'data/plane_to_plane',
+        addAnimationSuffix(filename) + ".gif",
+        args.access_key,
+        args.secret_key)
+
+
+    # make all tiles if you are using CSV file method
+    csvFilename = os.path.join(outputFolder, "images_plane_to_plane.csv")
+    #makeTilesPlaneToPlane(csvFilename, useEdges=False, useCenterPoints=True, oversegSource=oversegSourceForQualAndProcessAndRender)
+
+    # make qualification test if it's specified
+    makeQualificationsFile(imageFileList, range(0, 24+1), range(25, 49+1))
+
+
+    copyTilesToAmazonS3("plane_to_plane")
+    print "finished creating and uploading plane to plane tiles"
+    print "file to upload to Amazon Mechanical Turk:", csvFilename
+
+
 
 # make tiles for determining if superpixel should be connected
 # to superpizel that's above it
 print "----------------------------------------------"
-if args.zqual or args.zprocess:
-    if args.zqual: print "processing zqual"
+#if args.zqual or args.zprocess:
+if args.zprocess:
+    #if args.zqual: print "processing zqual"
     if args.zprocess: print "processing zprocess"
     if initSegFromPrecomputedStack:
         inputFileExtension = "mha"
@@ -3960,15 +4236,19 @@ if args.zqual or args.zprocess:
             if 0 or args.init or args.restart: initializeRequestLoop()
             if 1: requestLoop()
         else:
-            runCSVProcess()
+            runCSVProcess_old()
 
 
 
 if args.zqual:
+    makeZQual()
     propertiesFile = os.path.join(mturkScriptFolder, "plane_to_plane", "qualification.properties")
     print "properties", propertiesFile
     writePropertiesFile(propertiesFile)
-    os.system("cd " + os.path.join(mturkScriptFolder, "plane_to_plane") + ";" + "./run.sh")
+    #os.system("echo $JAVA_HOME")
+    command = "cd " + os.path.join(mturkScriptFolder, "plane_to_plane") + ";" + "./run.sh"
+    print command
+    os.system(command)
 
 # render graph
 if args.xyrender or args.zrender:
@@ -4062,7 +4342,7 @@ def sendRegionsToDatabase():
     #drawRegionsTest(allRegions)
     #sendRegionsAsContours(allRegions)
 
-    conn = sqlite3.connect(os.path.join(outputFolder, 'example.db'))
+    conn = sqlite3.connect(os.path.join(dataOutputFolder, 'example.db'))
     cur = conn.cursor()
 
     filename = os.path.join(outputFolder, "request_loop_data")
@@ -4118,6 +4398,8 @@ HITText = """<h2>Does the dot stay inside of the cell? (Note: If the dot goes on
 <p><img alt="image1" style="margin-right: 30px;" src="${image%d}" /></p>"""
 
 hitLayoutFile = open("hit.html", 'w')
+print
+print
 print "hit.html"
 hitLayoutFile.write(HITText % 1)
 hitLayoutFile.write(HITText % 2)

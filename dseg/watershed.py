@@ -117,6 +117,7 @@ def gaussian2DITK(input):
     return gaussian1.GetOutput()
 
 
+# returns numpy array of labels
 # good default values: threshold=0.00015, level=0.25
 def watershed2DNumpy(array, threshold, level, useGradientMagnitude=True):
 

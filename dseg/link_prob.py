@@ -61,6 +61,13 @@ def listToDict(region):
 
 def linkProbability(region1, region2):
 
+    pointDict1 = listToDict(region1)
+    pointDict2 = listToDict(region2)
+    return len(intersection(pointDict1, pointDict2))
+
+
+def linkProbability_old(region1, region2):
+
     #if abs(region1.z - region2.z) != 1:
     #    return None
 

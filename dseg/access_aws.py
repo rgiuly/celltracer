@@ -309,6 +309,7 @@ def initializeMTC(AccessID, SecretKey):
                           SecretKey,
                           host=mturkHost)
 
+
 def createHIT(parameter, max_assignments=1):
 
     quals = Qualifications();
@@ -316,8 +317,9 @@ def createHIT(parameter, max_assignments=1):
     quals.add(NumberHitsApprovedRequirement("GreaterThanOrEqualTo", "100"))
 
     if not(useSandbox):
-        # Requirement is named Cell_z_299_19_30_27
-        quals.add(Requirement("2VNUKQOYGNIW2Y6UN6R177SVGBOZHD", "GreaterThanOrEqualTo", "24"))
+        #quals.add(Requirement("2VNUKQOYGNIW2Y6UN6R177SVGBOZHD", "GreaterThanOrEqualTo", "24"))
+        #quals.add(Requirement("26C2D21O3W5XIBXBOI92RYEPLVQ9FH", "GreaterThanOrEqualTo", "24"))
+        quals.add(Requirement("22V6DG67D1X3WBT6Z2FK9JE1MAQ9GG", "GreaterThanOrEqualTo", "25"))
 
     #f1 = 'hello1.txt'
     #f2 = 'hello2.txt'
@@ -339,8 +341,8 @@ def createHIT(parameter, max_assignments=1):
                                        title="Does the dot stay inside the cell",
                                        description="Does the dot stay inside the cell",
                                        keywords="image, tag",
-                                       duration=timedelta(minutes=1),
-                                       lifetime=timedelta(minutes=40),
+                                       duration=timedelta(minutes=2),
+                                       lifetime=timedelta(minutes=60*48),
                                        qualifications=quals,
                                        max_assignments=max_assignments)
             hitWasCreated = True
